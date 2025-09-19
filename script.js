@@ -2,7 +2,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
         // Get DOM elements
         const fetchButton = document.getElementById('fetch-button');
-        const subredditSelect = document.getElementById('subreddit-select');
+        const subredditInput = document.getElementById('subreddit-input');
         const sortSelect = document.getElementById('sort-select'); // New element for sorting
         const storyContainer = document.getElementById('story-container');
         const loadingIndicator = document.getElementById('loading-indicator');
@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Event listeners
         fetchButton.addEventListener('click', () => {
-            const subreddit = subredditSelect.value;
+            const subreddit = subredditInput.value;
             const sort = sortSelect.value;
             fetchStories(subreddit, sort);
         });
@@ -36,7 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         // Initial fetch on page load (fetches newest stories by default)
-        fetchStories(subredditSelect.value, 'new');
+        fetchStories(subredditInput.value, 'new');
 
         // Function to show a popup with content
         function showPopup(title, content) {
@@ -100,7 +100,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             try {
-                const redditUrl = `${REDDIT_API_BASE_URL}${subredditSelect.value}/comments/${storyId}.json`;
+                const redditUrl = `${REDDIT_API_BASE_URL}${subredditInput.value}/comments/${storyId}.json`;
                 const proxyUrl = `${redditUrl}`; // Removed proxy prefix
                 const response = await fetch(proxyUrl);
                 if (!response.ok) {
