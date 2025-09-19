@@ -100,7 +100,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             initialContent += `<hr><p class="loading-message">Loading comments...</p>`;
             popupBody.innerHTML = initialContent;
-
+            
             try {
                 const redditUrl = `${REDDIT_API_BASE_URL}${subredditSelect.value}/comments/${storyId}.json`;
                 const proxyUrl = `${redditUrl}`; // Removed proxy prefix
@@ -133,8 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (loadingMessage) {
                     loadingMessage.remove();
                 }
-                popupBody.innerHTML += initialContent + commentsContent;
-
+                popupBody.innerHTML += commentsContent;
             } catch (error) {
                 console.error("Failed to fetch comments:", error);
                 const loadingMessage = popupBody.querySelector('.loading-message');
