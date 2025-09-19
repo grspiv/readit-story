@@ -15,6 +15,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const REDDIT_API_BASE_URL = 'https://www.reddit.com/r/';
         const CORS_PROXY_URL = ''; // Removed proxy URL as requested.
 
+        // Helper function to turn URLs into clickable links
+        function createClickableLinks(text) {
+            const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/g;
+            return text.replace(urlRegex, (url) => {
+                const href = url.startsWith('http') ? url : `http://${url}`;
+                return `<a href="${href}" target="_blank" rel="noopener noreferrer">${url}</a>`;
+            });
+        }
+
         // Event listeners
         fetchButton.addEventListener('click', () => {
             const subreddit = subredditInput.value;
@@ -45,8 +54,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 ? content
                 : "The full story could not be loaded or is empty.";
 
-            // Replace newlines with <br> tags to properly render paragraphs
-            const formattedContent = displayContent.replace(/\n/g, '<br>');
+            // Replace newlines with <br> tags and create clickable links
+            const formattedContent = createClickableLinks(displayContent).replace(/\n/g, '<br>');
 
             popupTitle.textContent = title;
             popupBody.innerHTML = formattedContent;
@@ -94,7 +103,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             let finalContent = '';
             if (selftext && selftext.trim().length > 0) {
-                finalContent += `<p>${selftext.replace(/\n/g, '<br>')}</p>`;
+                finalContent += `<p>${createClickableLinks(selftext).replace(/\n/g, '<br>')}</p>`;
             } else {
                 finalContent += `<p>This story has no body.</p>`;
             }
@@ -117,7 +126,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (commentData.body) {
                             finalContent += `<div class="comment-card">
                                 <p class="comment-author">u/${commentData.author}</p>
-                                <p class="comment-body">${commentData.body.replace(/\n/g, '<br>')}</p>
+                                <p class="comment-body">${createClickableLinks(commentData.body).replace(/\n/g, '<br>')}</p>
                             </div>`;
                         }
                     });
