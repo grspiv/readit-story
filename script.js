@@ -90,17 +90,15 @@ document.addEventListener('DOMContentLoaded', () => {
             popupTitle.textContent = title;
             document.body.style.overflow = 'hidden';
             popupOverlay.classList.add('active');
+            popupBody.innerHTML = `<p class="loading-message">Loading full story and comments...</p>`;
 
-            // Immediately display the story content while comments load
-            let initialContent = '';
+            let finalContent = '';
             if (selftext && selftext.trim().length > 0) {
-                initialContent += `<p>${selftext.replace(/\n/g, '<br>')}</p>`;
+                finalContent += `<p>${selftext.replace(/\n/g, '<br>')}</p>`;
             } else {
-                initialContent += `<p>This story has no body.</p>`;
+                finalContent += `<p>This story has no body.</p>`;
             }
-            initialContent += `<hr><p class="loading-message">Loading comments...</p>`;
-            popupBody.innerHTML = initialContent;
-            
+
             try {
                 const redditUrl = `${REDDIT_API_BASE_URL}${subredditSelect.value}/comments/${storyId}.json`;
                 const proxyUrl = `${redditUrl}`; // Removed proxy prefix
@@ -111,37 +109,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 const data = await response.json();
                 const comments = data[1].data.children.slice(0, 5); // Get the top 5 comments
 
-                // Build the comments content
-                let commentsContent = '';
+                finalContent += `<hr>`;
                 if (comments.length > 0) {
-                    commentsContent += `<h4>Top Comments:</h4>`;
+                    finalContent += `<h4>Top Comments:</h4>`;
                     comments.forEach(comment => {
                         const commentData = comment.data;
                         if (commentData.body) {
-                            commentsContent += `<div class="comment-card">
+                            finalContent += `<div class="comment-card">
                                 <p class="comment-author">u/${commentData.author}</p>
                                 <p class="comment-body">${commentData.body.replace(/\n/g, '<br>')}</p>
                             </div>`;
                         }
                     });
                 } else {
-                    commentsContent += `<p>No comments found.</p>`;
+                    finalContent += `<p>No comments found.</p>`;
                 }
-
-                // Update popup body with comments and remove loading message
-                const loadingMessage = popupBody.querySelector('.loading-message');
-                if (loadingMessage) {
-                    loadingMessage.remove();
-                }
-                popupBody.innerHTML += commentsContent;
             } catch (error) {
                 console.error("Failed to fetch comments:", error);
-                const loadingMessage = popupBody.querySelector('.loading-message');
-                if (loadingMessage) {
-                    loadingMessage.textContent = 'Could not load comments.';
-                    loadingMessage.classList.add('error-message');
-                }
+                finalContent += `<p class="error-message">Could not load comments.</p>`;
             }
+            
+            popupBody.innerHTML = finalContent;
         }
 
         // Function to display stories on the page
