@@ -15,25 +15,26 @@
     <main class="main-content">
         <section class="controls">
             <div class="input-group">
-                <label for="subreddit-select">Subreddit:</label>
-                <select id="subreddit-select" class="dropdown-input">
-                    <option value="AskReddit">AskReddit</option>
-                    <option value="WritingPrompts">WritingPrompts</option>
-                    <option value="TrueOffMyChest">TrueOffMyChest</option>
-                    <option value="TwoSentenceHorror">TwoSentenceHorror</option>
-                    <option value="TIFU">TIFU</option>
-                    <option value="Glitch_in_the_Matrix">Glitch in the Matrix</option>
-                    <option value="nosleep">Nosleep</option>
-                    <option value="Let me get this straight">Let me get this straight</option>
-                    <option value="Confessions">Confessions</option>
-                    <option value="ShortStory">ShortStory</option>
-                    <option value="TrueStory">TrueStory</option>
-                    <option value="MoralStories">MoralStories</option>
-                    <option value="HobbyDrama">HobbyDrama</option>
-                    <option value="TalesFromYourServer">TalesFromYourServer</option>
-                    <option value="TalesFromRetail">TalesFromRetail</option>
-                    <option value="JustNoMil">JustNoMil</option>
-                </select>
+                <label for="subreddit-input">Subreddit:</label>
+                <input type="text" id="subreddit-input" list="subreddit-list" value="AskReddit" class="text-input">
+                <datalist id="subreddit-list">
+                    <option value="AskReddit">
+                    <option value="WritingPrompts">
+                    <option value="TrueOffMyChest">
+                    <option value="TwoSentenceHorror">
+                    <option value="TIFU">
+                    <option value="Glitch_in_the_Matrix">
+                    <option value="nosleep">
+                    <option value="Let me get this straight">
+                    <option value="Confessions">
+                    <option value="ShortStory">
+                    <option value="TrueStory">
+                    <option value="MoralStories">
+                    <option value="HobbyDrama">
+                    <option value="TalesFromYourServer">
+                    <option value="TalesFromRetail">
+                    <option value="JustNoMil">
+                </datalist>
             </div>
             <div class="input-group">
                 <label for="sort-select">Sort by:</label>
