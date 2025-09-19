@@ -1,0 +1,190 @@
+document.addEventListener('DOMContentLoaded', () => {
+    try {
+        // Get DOM elements
+        const fetchButton = document.getElementById('fetch-button');
+        const subredditSelect = document.getElementById('subreddit-select');
+        const sortSelect = document.getElementById('sort-select'); // New element for sorting
+        const storyContainer = document.getElementById('story-container');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const popupOverlay = document.getElementById('popup-overlay');
+        const popupTitle = document.getElementById('popup-title');
+        const popupBody = document.getElementById('popup-body');
+        const closePopupButton = document.getElementById('close-popup');
+
+        // API Constants
+        const REDDIT_API_BASE_URL = 'https://www.reddit.com/r/';
+        const CORS_PROXY_URL = ''; // Removed proxy URL as requested.
+
+        // Event listeners
+        fetchButton.addEventListener('click', () => {
+            const subreddit = subredditSelect.value;
+            const sort = sortSelect.value;
+            fetchStories(subreddit, sort);
+        });
+
+        closePopupButton.addEventListener('click', () => {
+            popupOverlay.classList.remove('active');
+            document.body.style.overflow = 'auto'; // Re-enable scrolling
+        });
+
+        // Close the popup when a user clicks outside the content area
+        popupOverlay.addEventListener('click', (event) => {
+            if (event.target === popupOverlay) {
+                popupOverlay.classList.remove('active');
+                document.body.style.overflow = 'auto'; // Re-enable scrolling
+            }
+        });
+
+        // Initial fetch on page load (fetches newest stories by default)
+        fetchStories(subredditSelect.value, 'new');
+
+        // Function to show a popup with content
+        function showPopup(title, content) {
+            // Check if content is empty and provide a fallback message
+            const displayContent = content && content.trim().length > 0
+                ? content
+                : "The full story could not be loaded or is empty.";
+
+            // Replace newlines with <br> tags to properly render paragraphs
+            const formattedContent = displayContent.replace(/\n/g, '<br>');
+
+            popupTitle.textContent = title;
+            popupBody.innerHTML = formattedContent;
+            popupOverlay.classList.add('active');
+            document.body.style.overflow = 'hidden'; // Disable scrolling
+        }
+
+        // Function to display an error message in the popup
+        function showErrorPopup(message) {
+            showPopup("Error", message);
+        }
+
+        // Function to show/hide loading indicator
+        function showLoading(show) {
+            loadingIndicator.style.display = show ? 'block' : 'none';
+        }
+
+        // Function to fetch stories from Reddit
+        async function fetchStories(subreddit, sort) {
+            showLoading(true);
+            storyContainer.innerHTML = '';
+            const redditUrl = `${REDDIT_API_BASE_URL}${subreddit}/${sort}.json?limit=25`;
+            const proxyUrl = `${redditUrl}`; // Removed proxy prefix
+            try {
+                const response = await fetch(proxyUrl);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                const posts = data.data.children;
+                displayStories(posts);
+            } catch (error) {
+                console.error("Failed to fetch stories:", error);
+                showErrorPopup(`Could not fetch stories from r/${subreddit}. Please try again later.`);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function fetchAndShowComments(title, selftext, storyId) {
+            popupTitle.textContent = title;
+            document.body.style.overflow = 'hidden';
+            popupOverlay.classList.add('active');
+
+            // Immediately display the story content while comments load
+            let initialContent = '';
+            if (selftext && selftext.trim().length > 0) {
+                initialContent += `<p>${selftext.replace(/\n/g, '<br>')}</p>`;
+            } else {
+                initialContent += `<p>This story has no body.</p>`;
+            }
+            initialContent += `<hr><p class="loading-message">Loading comments...</p>`;
+            popupBody.innerHTML = initialContent;
+
+            try {
+                const redditUrl = `${REDDIT_API_BASE_URL}${subredditSelect.value}/comments/${storyId}.json`;
+                const proxyUrl = `${redditUrl}`; // Removed proxy prefix
+                const response = await fetch(proxyUrl);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                const comments = data[1].data.children.slice(0, 5); // Get the top 5 comments
+
+                // Build the comments content
+                let commentsContent = '';
+                if (comments.length > 0) {
+                    commentsContent += `<h4>Top Comments:</h4>`;
+                    comments.forEach(comment => {
+                        const commentData = comment.data;
+                        if (commentData.body) {
+                            commentsContent += `<div class="comment-card">
+                                <p class="comment-author">u/${commentData.author}</p>
+                                <p class="comment-body">${commentData.body.replace(/\n/g, '<br>')}</p>
+                            </div>`;
+                        }
+                    });
+                } else {
+                    commentsContent += `<p>No comments found.</p>`;
+                }
+
+                // Update popup body with comments and remove loading message
+                const loadingMessage = popupBody.querySelector('.loading-message');
+                if (loadingMessage) {
+                    loadingMessage.remove();
+                }
+                popupBody.innerHTML += initialContent + commentsContent;
+
+            } catch (error) {
+                console.error("Failed to fetch comments:", error);
+                const loadingMessage = popupBody.querySelector('.loading-message');
+                if (loadingMessage) {
+                    loadingMessage.textContent = 'Could not load comments.';
+                    loadingMessage.classList.add('error-message');
+                }
+            }
+        }
+
+        // Function to display stories on the page
+        function displayStories(posts) {
+            if (posts.length === 0) {
+                storyContainer.innerHTML = `<p class="text-center text-gray-500 col-span-full">No stories found. Please try a different subreddit.</p>`;
+                return;
+            }
+
+            posts.forEach(post => {
+                const story = post.data;
+                // Trim whitespace to ensure stories with empty or only-space bodies are not shown
+                const trimmedSelftext = story.selftext ? story.selftext.trim() : '';
+
+                // Determine the preview text. Use the story title if the body is empty.
+                const previewText = trimmedSelftext.length > 0 ? trimmedSelftext : story.title;
+
+                // Display a story if it's a self-post.
+                if (story.is_self) {
+                    const storyCard = document.createElement('div');
+                    storyCard.className = 'story-card';
+                    
+                    storyCard.innerHTML = `
+                        <h3>${story.title}</h3>
+                        <p class="author">by u/${story.author}</p>
+                        <p class="preview">${previewText}</p>
+                        <div class="button-container">
+                            <button class="read-button">Read Full Story</button>
+                        </div>
+                    `;
+                    
+                    const readButton = storyCard.querySelector('.read-button');
+                    
+                    readButton.addEventListener('click', () => {
+                        fetchAndShowComments(story.title, trimmedSelftext, story.id);
+                    });
+                    
+                    storyContainer.appendChild(storyCard);
+                }
+            });
+        }
+    } catch (e) {
+        console.error("An error occurred during page initialization:", e);
+    }
+});

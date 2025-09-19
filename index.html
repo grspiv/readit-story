@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reddit Storyteller</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <header class="app-header">
+        <h1>Reddit Storyteller</h1>
+    </header>
+    
+    <main class="main-content">
+        <section class="controls">
+            <div class="input-group">
+                <label for="subreddit-select">Subreddit:</label>
+                <input type="text" id="subreddit-select" value="AskReddit" class="text-input">
+            </div>
+            <div class="input-group">
+                <label for="sort-select">Sort by:</label>
+                <select id="sort-select" class="dropdown-input">
+                    <option value="hot">Hot</option>
+                    <option value="new">New</option>
+                    <option value="top">Top</option>
+                    <option value="rising">Rising</option>
+                    <option value="best">Best</option>
+                </select>
+            </div>
+            <button id="fetch-button" class="action-button">Get Stories</button>
+        </section>
+
+        <section id="story-container" class="story-container"></section>
+
+        <div id="loading-indicator" class="loading-indicator">
+            <div class="spinner"></div>
+            <span>Loading stories...</span>
+        </div>
+    </main>
+
+    <div id="popup-overlay" class="popup-overlay">
+        <div class="popup-content">
+            <div class="popup-header">
+                <h2 id="popup-title" class="popup-title"></h2>
+                <button id="close-popup" class="close-button">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+            </div>
+            <div id="popup-body" class="popup-body"></div>
+        </div>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>
