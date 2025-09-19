@@ -71,6 +71,12 @@ document.addEventListener('DOMContentLoaded', () => {
         // Function to show/hide loading indicator
         function showLoading(show) {
             loadingIndicator.style.display = show ? 'block' : 'none';
+            // Add or remove pulse animation on fetch button
+            if (show) {
+                fetchButton.classList.add('pulse-active');
+            } else {
+                fetchButton.classList.remove('pulse-active');
+            }
         }
 
         // Function to fetch stories from Reddit

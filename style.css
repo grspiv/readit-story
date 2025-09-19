@@ -18,6 +18,17 @@ body {
     line-height: 1.6;
     margin: 0;
     padding: 0;
+    /* Animated background */
+    background: radial-gradient(circle at top left, #c8e6c9, transparent),
+                radial-gradient(circle at bottom right, #f8bbd0, transparent),
+                var(--bg-color);
+    background-blend-mode: multiply;
+    animation: background-move 15s ease-in-out infinite alternate;
+}
+
+@keyframes background-move {
+    from { background-position: 0 0, 100% 100%; }
+    to { background-position: 100% 100%, 0 0; }
 }
 
 .app-header {
@@ -104,6 +115,16 @@ body {
 .action-button:active {
     transform: translateY(0);
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.action-button.pulse-active {
+    animation: pulse-button 1s infinite;
+}
+
+@keyframes pulse-button {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
 }
 
 .story-container {
