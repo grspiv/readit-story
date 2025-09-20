@@ -11,6 +11,27 @@
     --accent-color: #9b59b6;
 }
 
+body.dark {
+    --bg-color: #2c3e50;
+    --card-bg: #34495e;
+    --text-color: #ecf0f1;
+    --heading-color: #ffffff;
+    --border-color: #7f8c8d;
+    --shadow-color: rgba(0, 0, 0, 0.4);
+}
+
+body.sepia {
+    --bg-color: #f4e8d5;
+    --card-bg: #fdf6e3;
+    --text-color: #585040;
+    --heading-color: #002b36;
+    --button-color: #cb4b16;
+    --button-hover-color: #b58900;
+    --border-color: #d1c7b7;
+    --shadow-color: rgba(88, 80, 64, 0.2);
+}
+
+
 body {
     font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
     background-color: var(--bg-color);
@@ -24,6 +45,7 @@ body {
                 var(--bg-color);
     background-blend-mode: multiply;
     animation: background-move 15s ease-in-out infinite alternate;
+    transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 @keyframes background-move {
@@ -38,6 +60,9 @@ body {
     text-align: center;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
     margin-bottom: 30px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
 .app-header h1 {
@@ -46,6 +71,17 @@ body {
     letter-spacing: 2px;
     text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
 }
+
+.theme-switcher {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.theme-switcher label {
+    font-weight: bold;
+}
+
 
 .main-content {
     max-width: 1200px;
@@ -141,7 +177,7 @@ body {
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease, background-color 0.3s ease;
     border: 2px solid transparent;
 }
 
@@ -248,7 +284,7 @@ body {
     overflow-y: auto;
     box-shadow: 0 15px 30px rgba(0, 0, 0, 0.3);
     transform: scale(0.9);
-    transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), background-color 0.3s ease;
 }
 
 .popup-overlay.active .popup-content {
@@ -315,6 +351,7 @@ body {
     border-radius: 12px;
     margin-bottom: 15px;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    transition: background-color 0.3s ease;
 }
 
 .comment-author {
@@ -329,7 +366,37 @@ body {
     white-space: pre-wrap;
 }
 
+.back-to-top {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background-color: var(--button-color);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    display: none;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    transition: opacity 0.3s, transform 0.3s;
+    z-index: 999;
+}
+
+.back-to-top:hover {
+    background-color: var(--button-hover-color);
+    transform: scale(1.1);
+}
+
+
 @media (max-width: 768px) {
+    .app-header {
+        flex-direction: column;
+        gap: 15px;
+    }
+
     .controls {
         flex-direction: column;
         align-items: stretch;

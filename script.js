@@ -3,17 +3,53 @@ document.addEventListener('DOMContentLoaded', () => {
         // Get DOM elements
         const fetchButton = document.getElementById('fetch-button');
         const subredditInput = document.getElementById('subreddit-input');
-        const sortSelect = document.getElementById('sort-select'); // New element for sorting
+        const sortSelect = document.getElementById('sort-select');
         const storyContainer = document.getElementById('story-container');
         const loadingIndicator = document.getElementById('loading-indicator');
         const popupOverlay = document.getElementById('popup-overlay');
         const popupTitle = document.getElementById('popup-title');
         const popupBody = document.getElementById('popup-body');
         const closePopupButton = document.getElementById('close-popup');
+        const themeSelect = document.getElementById('theme-select');
+        const backToTopButton = document.getElementById('back-to-top');
 
         // API Constants
         const REDDIT_API_BASE_URL = 'https://www.reddit.com/r/';
-        const CORS_PROXY_URL = ''; // Removed proxy URL as requested.
+
+        // --- Theme Switcher ---
+        function applyTheme(theme) {
+            document.body.className = '';
+            if (theme !== 'light') {
+                document.body.classList.add(theme);
+            }
+            localStorage.setItem('theme', theme);
+            themeSelect.value = theme;
+        }
+
+        themeSelect.addEventListener('change', () => {
+            applyTheme(themeSelect.value);
+        });
+
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        applyTheme(savedTheme);
+        // --- End Theme Switcher ---
+
+
+        // --- Back to Top Button ---
+        window.onscroll = function() {
+            if (document.body.scrollTop > 100 || document.documentElement.scrollTop > 100) {
+                backToTopButton.style.display = "flex";
+            } else {
+                backToTopButton.style.display = "none";
+            }
+        };
+
+        backToTopButton.addEventListener('click', () => {
+            document.body.scrollTop = 0; // For Safari
+            document.documentElement.scrollTop = 0; // For Chrome, Firefox, IE and Opera
+        });
+        // --- End Back to Top Button ---
+
 
         // Helper function to turn URLs into clickable links
         function createClickableLinks(text) {
@@ -36,7 +72,6 @@ document.addEventListener('DOMContentLoaded', () => {
             document.body.style.overflow = 'auto'; // Re-enable scrolling
         });
 
-        // Close the popup when a user clicks outside the content area
         popupOverlay.addEventListener('click', (event) => {
             if (event.target === popupOverlay) {
                 popupOverlay.classList.remove('active');
@@ -44,17 +79,14 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // Initial fetch on page load (fetches newest stories by default)
+        // Initial fetch on page load
         fetchStories(subredditInput.value, 'new');
 
-        // Function to show a popup with content
         function showPopup(title, content) {
-            // Check if content is empty and provide a fallback message
             const displayContent = content && content.trim().length > 0
                 ? content
                 : "The full story could not be loaded or is empty.";
 
-            // Replace newlines with <br> tags and create clickable links
             const formattedContent = createClickableLinks(displayContent).replace(/\n/g, '<br>');
 
             popupTitle.textContent = title;
@@ -63,15 +95,12 @@ document.addEventListener('DOMContentLoaded', () => {
             document.body.style.overflow = 'hidden'; // Disable scrolling
         }
 
-        // Function to display an error message in the popup
         function showErrorPopup(message) {
             showPopup("Error", message);
         }
 
-        // Function to show/hide loading indicator
         function showLoading(show) {
             loadingIndicator.style.display = show ? 'block' : 'none';
-            // Add or remove pulse animation on fetch button
             if (show) {
                 fetchButton.classList.add('pulse-active');
             } else {
@@ -79,14 +108,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // Function to fetch stories from Reddit
         async function fetchStories(subreddit, sort) {
             showLoading(true);
             storyContainer.innerHTML = '';
             const redditUrl = `${REDDIT_API_BASE_URL}${subreddit}/${sort}.json?limit=25`;
-            const proxyUrl = `${redditUrl}`; // Removed proxy prefix
             try {
-                const response = await fetch(proxyUrl);
+                const response = await fetch(redditUrl);
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
@@ -116,8 +143,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             try {
                 const redditUrl = `${REDDIT_API_BASE_URL}${subredditInput.value}/comments/${storyId}.json`;
-                const proxyUrl = `${redditUrl}`; // Removed proxy prefix
-                const response = await fetch(proxyUrl);
+                const response = await fetch(redditUrl);
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
@@ -147,7 +173,6 @@ document.addEventListener('DOMContentLoaded', () => {
             popupBody.innerHTML = finalContent;
         }
 
-        // Function to display stories on the page
         function displayStories(posts) {
             if (posts.length === 0) {
                 storyContainer.innerHTML = `<p class="text-center text-gray-500 col-span-full">No stories found. Please try a different subreddit.</p>`;
@@ -156,13 +181,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             posts.forEach(post => {
                 const story = post.data;
-                // Trim whitespace to ensure stories with empty or only-space bodies are not shown
                 const trimmedSelftext = story.selftext ? story.selftext.trim() : '';
-
-                // Determine the preview text. Use the story title if the body is empty.
                 const previewText = trimmedSelftext.length > 0 ? trimmedSelftext : story.title;
 
-                // Display a story if it's a self-post.
                 if (story.is_self) {
                     const storyCard = document.createElement('div');
                     storyCard.className = 'story-card';
