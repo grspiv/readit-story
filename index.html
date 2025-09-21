@@ -22,7 +22,6 @@
     
     <main class="main-content">
         <section class="controls">
-            <!-- Subreddit Input -->
             <div class="input-group">
                 <label for="subreddit-input">Subreddit:</label>
                 <input type="text" id="subreddit-input" list="subreddit-list" value="AskReddit" class="text-input">
@@ -38,7 +37,6 @@
                 </datalist>
             </div>
             
-            <!-- Sort By Dropdown -->
             <div class="input-group">
                 <label for="sort-select">Sort by:</label>
                 <select id="sort-select" class="dropdown-input">
@@ -49,7 +47,6 @@
                 </select>
             </div>
             
-            <!-- NEW: Time Range Dropdown (for 'Top' sort) -->
             <div id="time-range-controls" class="input-group" style="display: none;">
                 <label for="time-range-select">Time Range:</label>
                 <select id="time-range-select" class="dropdown-input">
@@ -69,6 +66,11 @@
         <div id="loading-indicator" class="loading-indicator">
             <div class="spinner"></div>
             <span>Loading stories...</span>
+        </div>
+
+        <!-- NEW: Container for the load more button -->
+        <div class="load-more-container">
+            <button id="load-more-button" class="action-button" style="display: none;">Load More Stories</button>
         </div>
     </main>
 

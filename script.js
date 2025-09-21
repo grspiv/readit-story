@@ -12,12 +12,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const closePopupButton = document.getElementById('close-popup');
         const themeSelect = document.getElementById('theme-select');
         const backToTopButton = document.getElementById('back-to-top');
-        // NEW: Time range elements
         const timeRangeControls = document.getElementById('time-range-controls');
         const timeRangeSelect = document.getElementById('time-range-select');
+        // NEW: Load More Button
+        const loadMoreButton = document.getElementById('load-more-button');
 
         // API Constants
         const REDDIT_API_BASE_URL = 'https://www.reddit.com/r/';
+
+        // State for pagination
+        let currentAfterToken = null;
 
         // --- Theme Switcher ---
         function applyTheme(theme) {
@@ -68,13 +72,24 @@ document.addEventListener('DOMContentLoaded', () => {
             const sort = sortSelect.value;
             const timeRange = timeRangeSelect.value;
             if (subreddit) {
-                fetchStories(subreddit, sort, timeRange);
+                // False indicates this is a new search, not loading more
+                fetchStories(subreddit, sort, timeRange, false);
             } else {
                 showErrorPopup("Please enter a subreddit name.");
             }
         });
 
-        // NEW: Show/hide time range controls based on sort selection
+        // NEW: Load More button listener
+        loadMoreButton.addEventListener('click', () => {
+            const subreddit = subredditInput.value.trim();
+            const sort = sortSelect.value;
+            const timeRange = timeRangeSelect.value;
+            if (subreddit && currentAfterToken) {
+                 // True indicates we are loading more stories
+                fetchStories(subreddit, sort, timeRange, true);
+            }
+        });
+
         sortSelect.addEventListener('change', () => {
             if (sortSelect.value === 'top') {
                 timeRangeControls.style.display = 'flex';
@@ -85,18 +100,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
         closePopupButton.addEventListener('click', () => {
             popupOverlay.classList.remove('active');
-            document.body.style.overflow = 'auto'; // Re-enable scrolling
+            document.body.style.overflow = 'auto';
         });
 
         popupOverlay.addEventListener('click', (event) => {
             if (event.target === popupOverlay) {
                 popupOverlay.classList.remove('active');
-                document.body.style.overflow = 'auto'; // Re-enable scrolling
+                document.body.style.overflow = 'auto';
             }
         });
 
         // Initial fetch on page load
-        fetchStories(subredditInput.value, 'hot');
+        fetchStories(subredditInput.value, 'hot', 'all', false);
 
         function showPopup(title, content) {
             const displayContent = content && content.trim().length > 0
@@ -108,29 +123,42 @@ document.addEventListener('DOMContentLoaded', () => {
             popupTitle.textContent = title;
             popupBody.innerHTML = formattedContent;
             popupOverlay.classList.add('active');
-            document.body.style.overflow = 'hidden'; // Disable scrolling
+            document.body.style.overflow = 'hidden';
         }
 
         function showErrorPopup(message) {
             showPopup("Error", message);
         }
 
-        function showLoading(show) {
-            loadingIndicator.style.display = show ? 'flex' : 'none';
-            if (show) {
-                fetchButton.classList.add('pulse-active');
+        function showLoading(show, isLoadMore) {
+            // Use loading indicator for initial load, pulse button for "load more"
+            if (isLoadMore) {
+                loadingIndicator.style.display = 'none';
+                if (show) loadMoreButton.classList.add('pulse-active');
+                else loadMoreButton.classList.remove('pulse-active');
             } else {
-                fetchButton.classList.remove('pulse-active');
+                loadingIndicator.style.display = show ? 'flex' : 'none';
+                if (show) fetchButton.classList.add('pulse-active');
+                else fetchButton.classList.remove('pulse-active');
             }
         }
 
-        async function fetchStories(subreddit, sort, timeRange = 'all') {
-            showLoading(true);
-            storyContainer.innerHTML = '';
-            // UPDATED: Append time range if sorting by top
+        async function fetchStories(subreddit, sort, timeRange = 'all', loadMore = false) {
+            showLoading(true, loadMore);
+            if (!loadMore) {
+                storyContainer.innerHTML = '';
+                currentAfterToken = null;
+            }
+            // Hide button while fetching new data
+            loadMoreButton.style.display = 'none';
+
             let redditUrl = `${REDDIT_API_BASE_URL}${subreddit}/${sort}.json?limit=25`;
             if (sort === 'top') {
                 redditUrl += `&t=${timeRange}`;
+            }
+            // Add 'after' token for pagination if we're loading more
+            if (loadMore && currentAfterToken) {
+                redditUrl += `&after=${currentAfterToken}`;
             }
 
             try {
@@ -143,12 +171,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 const data = await response.json();
                 const posts = data.data.children;
-                displayStories(posts);
+                // Update the token for the next page
+                currentAfterToken = data.data.after;
+
+                if (posts.length === 0 && !loadMore) {
+                    storyContainer.innerHTML = `<p class="text-center text-gray-500 col-span-full">No stories found. Please try a different subreddit or filter.</p>`;
+                } else {
+                    displayStories(posts);
+                }
             } catch (error) {
                 console.error("Failed to fetch stories:", error);
                 showErrorPopup(`Could not fetch stories. ${error.message}`);
             } finally {
-                showLoading(false);
+                showLoading(false, loadMore);
+                // Show "Load More" button if there's a token for a next page
+                if (currentAfterToken) {
+                    loadMoreButton.style.display = 'block';
+                }
             }
         }
 
@@ -170,7 +209,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 const data = await response.json();
-                const comments = data[1].data.children.slice(0, 10); // Get top 10 comments
+                const comments = data[1].data.children.slice(0, 10);
 
                 finalContent += `<hr>`;
                 if (comments.length > 0) {
@@ -196,23 +235,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         function displayStories(posts) {
-            if (posts.length === 0) {
-                storyContainer.innerHTML = `<p class="text-center text-gray-500 col-span-full">No stories found. Please try a different subreddit or filter.</p>`;
-                return;
-            }
-
+            // This function now just appends new stories to the container
             posts.forEach(post => {
                 const story = post.data;
                 const trimmedSelftext = story.selftext ? story.selftext.trim() : '';
                 
-                // Show title as preview if selftext is empty
                 const previewText = trimmedSelftext.length > 0 ? trimmedSelftext : story.title;
 
                 if (story.is_self) {
                     const storyCard = document.createElement('div');
                     storyCard.className = 'story-card';
                     
-                    // UPDATED: Added story-meta div for score and comments
                     storyCard.innerHTML = `
                         <div class="story-meta">
                             <span>
@@ -247,3 +280,4 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.innerHTML = "<h1>A critical error occurred. Please refresh the page.</h1>";
     }
 });
+
