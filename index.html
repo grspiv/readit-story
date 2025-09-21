@@ -22,28 +22,23 @@
     
     <main class="main-content">
         <section class="controls">
+            <!-- Subreddit Input -->
             <div class="input-group">
                 <label for="subreddit-input">Subreddit:</label>
                 <input type="text" id="subreddit-input" list="subreddit-list" value="AskReddit" class="text-input">
                 <datalist id="subreddit-list">
-                    <option value="AskReddit">
-                    <option value="WritingPrompts">
-                    <option value="TrueOffMyChest">
-                    <option value="TwoSentenceHorror">
-                    <option value="TIFU">
-                    <option value="Glitch_in_the_Matrix">
-                    <option value="nosleep">
-                    <option value="Let me get this straight">
-                    <option value="Confessions">
-                    <option value="ShortStory">
-                    <option value="TrueStory">
-                    <option value="MoralStories">
-                    <option value="HobbyDrama">
-                    <option value="TalesFromYourServer">
-                    <option value="TalesFromRetail">
-                    <option value="JustNoMil">
+                    <option value="AskReddit"></option>
+                    <option value="WritingPrompts"></option>
+                    <option value="TrueOffMyChest"></option>
+                    <option value="TwoSentenceHorror"></option>
+                    <option value="TIFU"></option>
+                    <option value="nosleep"></option>
+                    <option value="MaliciousCompliance"></option>
+                    <option value="IDontWorkHereLady"></option>
                 </datalist>
             </div>
+            
+            <!-- Sort By Dropdown -->
             <div class="input-group">
                 <label for="sort-select">Sort by:</label>
                 <select id="sort-select" class="dropdown-input">
@@ -51,9 +46,21 @@
                     <option value="new">New</option>
                     <option value="top">Top</option>
                     <option value="rising">Rising</option>
-                    <option value="best">Best</option>
                 </select>
             </div>
+            
+            <!-- NEW: Time Range Dropdown (for 'Top' sort) -->
+            <div id="time-range-controls" class="input-group" style="display: none;">
+                <label for="time-range-select">Time Range:</label>
+                <select id="time-range-select" class="dropdown-input">
+                    <option value="all">All Time</option>
+                    <option value="year">Past Year</option>
+                    <option value="month">Past Month</option>
+                    <option value="week">Past Week</option>
+                    <option value="day">Past 24 Hours</option>
+                </select>
+            </div>
+
             <button id="fetch-button" class="action-button">Get Stories</button>
         </section>
 
@@ -82,6 +89,8 @@
     <button id="back-to-top" class="back-to-top" title="Go to top">
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
     </button>
+
     <script src="script.js"></script>
 </body>
 </html>
+

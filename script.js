@@ -12,6 +12,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const closePopupButton = document.getElementById('close-popup');
         const themeSelect = document.getElementById('theme-select');
         const backToTopButton = document.getElementById('back-to-top');
+        // NEW: Time range elements
+        const timeRangeControls = document.getElementById('time-range-controls');
+        const timeRangeSelect = document.getElementById('time-range-select');
 
         // API Constants
         const REDDIT_API_BASE_URL = 'https://www.reddit.com/r/';
@@ -50,7 +53,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         // --- End Back to Top Button ---
 
-
         // Helper function to turn URLs into clickable links
         function createClickableLinks(text) {
             const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/g;
@@ -59,12 +61,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 return `<a href="${href}" target="_blank" rel="noopener noreferrer">${url}</a>`;
             });
         }
-
-        // Event listeners
+        
+        // --- Event listeners ---
         fetchButton.addEventListener('click', () => {
-            const subreddit = subredditInput.value;
+            const subreddit = subredditInput.value.trim();
             const sort = sortSelect.value;
-            fetchStories(subreddit, sort);
+            const timeRange = timeRangeSelect.value;
+            if (subreddit) {
+                fetchStories(subreddit, sort, timeRange);
+            } else {
+                showErrorPopup("Please enter a subreddit name.");
+            }
+        });
+
+        // NEW: Show/hide time range controls based on sort selection
+        sortSelect.addEventListener('change', () => {
+            if (sortSelect.value === 'top') {
+                timeRangeControls.style.display = 'flex';
+            } else {
+                timeRangeControls.style.display = 'none';
+            }
         });
 
         closePopupButton.addEventListener('click', () => {
@@ -80,7 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         // Initial fetch on page load
-        fetchStories(subredditInput.value, 'new');
+        fetchStories(subredditInput.value, 'hot');
 
         function showPopup(title, content) {
             const displayContent = content && content.trim().length > 0
@@ -100,7 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         function showLoading(show) {
-            loadingIndicator.style.display = show ? 'block' : 'none';
+            loadingIndicator.style.display = show ? 'flex' : 'none';
             if (show) {
                 fetchButton.classList.add('pulse-active');
             } else {
@@ -108,13 +124,21 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        async function fetchStories(subreddit, sort) {
+        async function fetchStories(subreddit, sort, timeRange = 'all') {
             showLoading(true);
             storyContainer.innerHTML = '';
-            const redditUrl = `${REDDIT_API_BASE_URL}${subreddit}/${sort}.json?limit=25`;
+            // UPDATED: Append time range if sorting by top
+            let redditUrl = `${REDDIT_API_BASE_URL}${subreddit}/${sort}.json?limit=25`;
+            if (sort === 'top') {
+                redditUrl += `&t=${timeRange}`;
+            }
+
             try {
                 const response = await fetch(redditUrl);
                 if (!response.ok) {
+                    if (response.status === 404) {
+                        throw new Error(`Subreddit 'r/${subreddit}' not found.`);
+                    }
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 const data = await response.json();
@@ -122,33 +146,31 @@ document.addEventListener('DOMContentLoaded', () => {
                 displayStories(posts);
             } catch (error) {
                 console.error("Failed to fetch stories:", error);
-                showErrorPopup(`Could not fetch stories from r/${subreddit}. Please try again later.`);
+                showErrorPopup(`Could not fetch stories. ${error.message}`);
             } finally {
                 showLoading(false);
             }
         }
 
-        async function fetchAndShowComments(title, selftext, storyId) {
+        async function fetchAndShowComments(title, selftext, storyId, subreddit) {
             popupTitle.textContent = title;
             document.body.style.overflow = 'hidden';
             popupOverlay.classList.add('active');
-            popupBody.innerHTML = `<p class="loading-message">Loading full story and comments...</p>`;
+            popupBody.innerHTML = `<div class="spinner"></div><p class="loading-message">Loading full story and comments...</p>`;
 
             let finalContent = '';
             if (selftext && selftext.trim().length > 0) {
                 finalContent += `<p>${createClickableLinks(selftext).replace(/\n/g, '<br>')}</p>`;
-            } else {
-                finalContent += `<p>This story has no body.</p>`;
             }
 
             try {
-                const redditUrl = `${REDDIT_API_BASE_URL}${subredditInput.value}/comments/${storyId}.json`;
+                const redditUrl = `${REDDIT_API_BASE_URL}${subreddit}/comments/${storyId}.json`;
                 const response = await fetch(redditUrl);
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 const data = await response.json();
-                const comments = data[1].data.children.slice(0, 5); // Get the top 5 comments
+                const comments = data[1].data.children.slice(0, 10); // Get top 10 comments
 
                 finalContent += `<hr>`;
                 if (comments.length > 0) {
@@ -175,20 +197,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
         function displayStories(posts) {
             if (posts.length === 0) {
-                storyContainer.innerHTML = `<p class="text-center text-gray-500 col-span-full">No stories found. Please try a different subreddit.</p>`;
+                storyContainer.innerHTML = `<p class="text-center text-gray-500 col-span-full">No stories found. Please try a different subreddit or filter.</p>`;
                 return;
             }
 
             posts.forEach(post => {
                 const story = post.data;
                 const trimmedSelftext = story.selftext ? story.selftext.trim() : '';
+                
+                // Show title as preview if selftext is empty
                 const previewText = trimmedSelftext.length > 0 ? trimmedSelftext : story.title;
 
                 if (story.is_self) {
                     const storyCard = document.createElement('div');
                     storyCard.className = 'story-card';
                     
+                    // UPDATED: Added story-meta div for score and comments
                     storyCard.innerHTML = `
+                        <div class="story-meta">
+                            <span>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M12 2L2 12h5v10h10V12h5L12 2z"/></svg>
+                                ${story.score.toLocaleString()}
+                            </span>
+                            <span>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M21.99 4c0-1.1-.89-2-1.99-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14l4 4-.01-18z"/></svg>
+                                ${story.num_comments.toLocaleString()}
+                            </span>
+                        </div>
                         <h3>${story.title}</h3>
                         <p class="author">by u/${story.author}</p>
                         <p class="preview">${previewText}</p>
@@ -200,7 +235,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const readButton = storyCard.querySelector('.read-button');
                     
                     readButton.addEventListener('click', () => {
-                        fetchAndShowComments(story.title, trimmedSelftext, story.id);
+                        fetchAndShowComments(story.title, trimmedSelftext, story.id, story.subreddit);
                     });
                     
                     storyContainer.appendChild(storyCard);
@@ -209,5 +244,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     } catch (e) {
         console.error("An error occurred during page initialization:", e);
+        document.body.innerHTML = "<h1>A critical error occurred. Please refresh the page.</h1>";
     }
 });
