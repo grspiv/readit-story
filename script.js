@@ -22,6 +22,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const storiesHeading = document.getElementById('stories-heading');
         const controlsSection = document.querySelector('.controls');
         const clearSavedButton = document.getElementById('clear-saved-button');
+        const exportSavedButton = document.getElementById('export-saved-button');
+        const importSavedButton = document.getElementById('import-saved-button');
+        const importFileInput = document.getElementById('import-file-input');
         const clearSavedContainer = document.getElementById('clear-saved-container');
         const flairFilterInput = document.getElementById('flair-filter-input');
         const filterSection = document.getElementById('filter-section');
@@ -29,6 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const savedSortSelect = document.getElementById('saved-sort-select');
         const toastNotification = document.getElementById('toast-notification');
         const layoutToggleButton = document.getElementById('layout-toggle-button');
+        const galleryToggleButton = document.getElementById('gallery-toggle-button');
         const layoutIconGrid = document.getElementById('layout-icon-grid');
         const layoutIconList = document.getElementById('layout-icon-list');
         const nsfwToggle = document.getElementById('nsfw-toggle');
@@ -38,6 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const SAVED_STORIES_KEY = 'redditStorytellerSaved';
         const SUBREDDIT_HISTORY_KEY = 'redditStorytellerHistory';
         const LAYOUT_PREFERENCE_KEY = 'redditStorytellerLayout';
+        const GALLERY_PREFERENCE_KEY = 'redditStorytellerGallery';
         const NSFW_PREFERENCE_KEY = 'redditStorytellerNSFW';
         const RANDOM_SUBREDDITS = ['nosleep', 'LetsNotMeet', 'glitch_in_the_matrix', 'tifu', 'confession', 'maliciouscompliance', 'talesfromtechsupport', 'WritingPrompts', 'shortscarystories', 'UnresolvedMysteries'];
         let currentAfterToken = null;
@@ -54,11 +59,16 @@ document.addEventListener('DOMContentLoaded', () => {
         applyLayout(savedLayout);
         applyNSFWPreference(savedNSFWPreference);
         populateSubredditHistory();
-        fetchStories(subredditInput.value, 'hot', 'all', false);
+        
+        // Load a random subreddit on first page load
+        const initialSubreddit = RANDOM_SUBREDDITS[Math.floor(Math.random() * RANDOM_SUBREDDITS.length)];
+        subredditInput.value = initialSubreddit;
+        fetchStories(initialSubreddit, 'hot', 'all', false);
 
         // --- Event Listeners ---
         themeSelect.addEventListener('change', () => applyTheme(themeSelect.value));
         layoutToggleButton.addEventListener('click', handleLayoutToggle);
+        galleryToggleButton.addEventListener('click', handleGalleryToggle);
         nsfwToggle.addEventListener('change', () => applyNSFWPreference(nsfwToggle.checked, true));
         fetchButton.addEventListener('click', handleFetchClick);
         randomButton.addEventListener('click', handleRandomClick);
@@ -66,6 +76,9 @@ document.addEventListener('DOMContentLoaded', () => {
         sortSelect.addEventListener('change', handleSortChange);
         viewSavedButton.addEventListener('click', handleViewSavedClick);
         clearSavedButton.addEventListener('click', handleClearSaved);
+        exportSavedButton.addEventListener('click', handleExportSaved);
+        importSavedButton.addEventListener('click', () => importFileInput.click());
+        importFileInput.addEventListener('change', handleImportFile);
         savedSortSelect.addEventListener('change', displaySavedStories);
         flairFilterInput.addEventListener('input', () => renderStories(allFetchedPosts));
         closePopupButton.addEventListener('click', closePopup);
@@ -82,16 +95,26 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         function applyLayout(layout) {
+            storyContainer.classList.remove('list-view', 'gallery-view');
+            
             if (layout === 'list') {
                 storyContainer.classList.add('list-view');
                 layoutIconGrid.style.display = 'none';
                 layoutIconList.style.display = 'block';
-            } else {
-                storyContainer.classList.remove('list-view');
+            } else if (layout === 'gallery') {
+                storyContainer.classList.add('gallery-view');
+            } else { // Grid
                 layoutIconGrid.style.display = 'block';
                 layoutIconList.style.display = 'none';
             }
-            localStorage.setItem(LAYOUT_PREFERENCE_KEY, layout);
+            
+            // Highlight active layout button
+            layoutToggleButton.classList.toggle('active', layout === 'grid' || layout === 'list');
+            galleryToggleButton.classList.toggle('active', layout === 'gallery');
+
+            if (layout !== 'gallery') { // Don't save gallery mode as the main layout
+                localStorage.setItem(LAYOUT_PREFERENCE_KEY, layout);
+            }
         }
 
         function applyNSFWPreference(isBlurred, shouldRender = false) {
@@ -106,6 +129,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const isListView = storyContainer.classList.contains('list-view');
             applyLayout(isListView ? 'grid' : 'list');
         }
+        
+        function handleGalleryToggle() {
+            const isGalleryView = storyContainer.classList.contains('gallery-view');
+            const savedLayout = localStorage.getItem(LAYOUT_PREFERENCE_KEY) || 'grid';
+            applyLayout(isGalleryView ? savedLayout : 'gallery');
+        }
+
 
         function handleFetchClick() {
             isShowingSaved = false;
@@ -173,7 +203,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         function closePopup() {
-            window.speechSynthesis.cancel(); // Stop any speech on close
+            window.speechSynthesis.cancel();
             popupOverlay.classList.remove('active');
             document.body.style.overflow = 'auto';
             const video = popupBody.querySelector('video');
@@ -193,6 +223,7 @@ document.addEventListener('DOMContentLoaded', () => {
         function showErrorPopup(message) {
             popupTitle.textContent = "Error";
             popupBody.innerHTML = `<p>${message}</p>`;
+            popupControls.innerHTML = '';
             popupOverlay.classList.add('active');
             document.body.style.overflow = 'hidden';
         }
@@ -212,14 +243,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 else loadMoreButton.classList.remove('pulse-active');
             } else {
                 loadingIndicator.style.display = show ? 'flex' : 'none';
-                if (show) fetchButton.classList.add('pulse-active');
-                else fetchButton.classList.remove('pulse-active');
+                if (show) {
+                    fetchButton.classList.add('pulse-active');
+                } else {
+                    fetchButton.classList.remove('pulse-active');
+                }
             }
         }
 
         async function fetchStories(subreddit, sort, timeRange = 'all', loadMore = false, query = '') {
             if (!loadMore) {
-                saveSubredditToHistory(subreddit);
+                if (!subreddit.includes('+') && !query.toLowerCase().startsWith('author:')) saveSubredditToHistory(subreddit);
                 allFetchedPosts = [];
                 currentAfterToken = null;
                 flairFilterInput.value = '';
@@ -251,7 +285,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             } catch (error) {
                 console.error("Failed to fetch stories:", error);
-                showErrorPopup(`Could not fetch stories. ${error.message}`);
+                showErrorPopup(`Could not fetch stories. The subreddit might be private, banned, or misspelled. ${error.message}`);
                 storyContainer.innerHTML = '';
             } finally {
                 showLoading(false, loadMore);
@@ -328,35 +362,97 @@ document.addEventListener('DOMContentLoaded', () => {
                 const response = await fetch(commentsUrl);
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const data = await response.json();
-                const comments = data[1].data.children.slice(0, 10);
+                const comments = data[1].data.children;
 
-                finalContent += `<hr>`;
-                if (comments.length > 0) {
-                    finalContent += `<h4>Top Comments:</h4>`;
-                    finalContent += comments.map(c => c.data).filter(c => c.body).map(c => {
-                        let commentBody = c.body;
-                        if (currentSearchQuery) {
-                           commentBody = highlightKeywords(commentBody, currentSearchQuery);
-                        }
-                        return `
-                        <div class="comment-card" data-comment-author="${c.author}">
-                            <p class="comment-author">u/${c.author}</p>
-                            <p class="comment-body">${commentBody.replace(/\n/g, '<br>')}</p>
-                        </div>`
-                    }).join('');
-                } else {
-                    finalContent += `<p>No comments found.</p>`;
-                }
+                finalContent += `<hr><div id="comment-section"><h4>Top Comments:</h4></div>`;
+                
+                popupBody.innerHTML = finalContent;
+                appendComments(story.name, comments);
+
             } catch (error) {
                 console.error("Failed to fetch comments:", error);
-                finalContent += `<p>Could not load comments.</p>`;
+                popupBody.innerHTML += `<p>Could not load comments.</p>`;
             }
-            
-            popupBody.innerHTML = finalContent;
+        }
+
+        function appendComments(postName, commentData) {
+            const commentSection = document.getElementById('comment-section');
+            if (!commentSection) return;
+
+            const moreCommentsObject = commentData.find(c => c.kind === 'more');
+            const actualComments = commentData.filter(c => c.kind === 't1');
+
+            if (actualComments.length > 0) {
+                 commentSection.innerHTML += actualComments.map(c => c.data).filter(c => c.body).map(c => {
+                    let commentBody = c.body;
+                    if (currentSearchQuery) {
+                       commentBody = highlightKeywords(commentBody, currentSearchQuery);
+                    }
+                    return `
+                    <div class="comment-card" data-comment-author="${c.author}">
+                        <p class="comment-author">u/${c.author}</p>
+                        <p class="comment-body">${commentBody.replace(/\n/g, '<br>')}</p>
+                    </div>`
+                }).join('');
+            }
+
+            const loadMoreContainer = document.querySelector('.load-more-comments-container');
+            if (loadMoreContainer) loadMoreContainer.remove();
+
+            if (moreCommentsObject && moreCommentsObject.data.children.length > 0) {
+                const newLoadMoreContainer = document.createElement('div');
+                newLoadMoreContainer.className = 'load-more-comments-container';
+                const loadMoreCommentsButton = document.createElement('button');
+                loadMoreCommentsButton.className = 'action-button secondary';
+                loadMoreCommentsButton.textContent = `Load More Replies (${moreCommentsObject.data.children.length})`;
+                
+                loadMoreCommentsButton.onclick = () => {
+                    fetchMoreComments(postName, moreCommentsObject.data.children, newLoadMoreContainer);
+                    loadMoreCommentsButton.textContent = 'Loading...';
+                    loadMoreCommentsButton.disabled = true;
+                };
+                newLoadMoreContainer.appendChild(loadMoreCommentsButton);
+                commentSection.appendChild(newLoadMoreContainer);
+            }
+        }
+
+        async function fetchMoreComments(postName, childrenIds, buttonContainer) {
+            try {
+                const ids = childrenIds.slice(0, 100).join(','); // Reddit API limit
+                const remainingIds = childrenIds.slice(100);
+
+                const url = `https://api.reddit.com/api/morechildren.json?api_type=json&link_id=${postName}&children=${ids}`;
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const data = await response.json();
+                
+                const newComments = data.json.data.things;
+                
+                buttonContainer.remove();
+                appendComments(postName, newComments);
+
+            } catch (error) {
+                console.error('Failed to fetch more comments:', error);
+                buttonContainer.innerHTML = `<p>Failed to load more comments.</p>`;
+            }
         }
 
         function renderStories(posts) {
             storyContainer.innerHTML = '';
+            
+            // Check for Gallery Mode eligibility
+            const imagePosts = posts.filter(p => p.post_hint === 'image').length;
+            const isGalleryEligible = (imagePosts / posts.length) > 0.5;
+            galleryToggleButton.style.display = isGalleryEligible ? 'block' : 'none';
+
+            // Restore gallery view if it was active
+            if (isGalleryEligible && localStorage.getItem(GALLERY_PREFERENCE_KEY) === 'true') {
+                 applyLayout('gallery');
+            } else {
+                 applyLayout(localStorage.getItem(LAYOUT_PREFERENCE_KEY) || 'grid');
+            }
+
+
             const flairFilter = flairFilterInput.value.trim().toLowerCase();
             const filteredPosts = flairFilter 
                 ? posts.filter(story => story.link_flair_text && story.link_flair_text.toLowerCase().includes(flairFilter))
@@ -383,6 +479,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const redditLink = `https://www.reddit.com${story.permalink}`;
                 const readingTime = calculateReadingTime(story.selftext);
                 const isSensitive = story.over_18 || story.spoiler;
+                const crosspostParent = story.crosspost_parent_list?.[0];
 
                 if (shouldBlur && isSensitive) {
                     storyCard.classList.add('nsfw-blur');
@@ -403,13 +500,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 storyCard.innerHTML += `
                     ${createMediaElement(story, false)}
                     <div class="story-card-content">
+                        ${crosspostParent ? `<div class="crosspost-info">Cross-posted from <a href="#" data-crosspost-sub="${crosspostParent.subreddit}">r/${crosspostParent.subreddit}</a></div>` : ''}
                         <div class="story-meta">
                             <span><svg viewBox="0 0 24 24"><path d="M12 2L2 12h5v10h10V12h5L12 2z"/></svg>${story.score.toLocaleString()}</span>
                             <span><svg viewBox="0 0 24 24"><path d="M21.99 4c0-1.1-.89-2-1.99-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14l4 4-.01-18z"/></svg>${story.num_comments.toLocaleString()}</span>
                             ${story.link_flair_text ? `<span class="story-flair">${story.link_flair_text}</span>` : ''}
                         </div>
                         <h3><a href="${redditLink}" target="_blank" rel="noopener noreferrer">${story.title}</a></h3>
-                        <p class="author">by <a href="https://www.reddit.com/user/${story.author}" target="_blank" rel="noopener noreferrer">u/${story.author}</a></p>
+                        <p class="author" title="Find all posts by this author">by u/${story.author}</p>
                         <p class="reading-time">${readingTime}</p>
                         <p class="preview">${story.selftext ? story.selftext.substring(0, 150) + '...' : ''}</p>
                         <div class="story-card-actions">
@@ -427,11 +525,22 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>`;
 
                 storyCard.querySelector('.read-button').addEventListener('click', () => fetchAndShowComments(story));
+                storyCard.querySelector('.author').addEventListener('click', () => handleAuthorClick(story.author));
                 storyCard.querySelector('.save-button').addEventListener('click', (e) => toggleSaveStory(e, story));
                 storyCard.querySelector('.share-button').addEventListener('click', () => {
                     navigator.clipboard.writeText(redditLink);
                     showToast('Link copied to clipboard!');
                 });
+                
+                const crosspostLink = storyCard.querySelector('.crosspost-info a');
+                if (crosspostLink) {
+                    crosspostLink.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        subredditInput.value = e.target.dataset.crosspostSub;
+                        searchInput.value = '';
+                        handleFetchClick();
+                    });
+                }
                 
                 storyContainer.appendChild(storyCard);
             });
@@ -497,6 +606,12 @@ document.addEventListener('DOMContentLoaded', () => {
             window.speechSynthesis.speak(utterance);
         }
 
+        function handleAuthorClick(author) {
+            searchInput.value = `author:${author}`;
+            handleFetchClick();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+        
         // --- Saved Stories & History Functions ---
         function toggleSaveStory(event, story) {
             const button = event.target;
@@ -528,6 +643,7 @@ document.addEventListener('DOMContentLoaded', () => {
         function displaySavedStories() {
             storyContainer.innerHTML = '';
             loadMoreButton.style.display = 'none';
+            galleryToggleButton.style.display = 'none';
             
             let savedStories = getSavedStories();
             const sortMethod = savedSortSelect.value;
@@ -558,13 +674,68 @@ document.addEventListener('DOMContentLoaded', () => {
                 storyContainer.innerHTML = `<p class="empty-state">You haven't saved any stories yet.</p>`;
             }
         }
+        
+        function handleExportSaved() {
+            const savedStories = getSavedStories();
+            if (savedStories.length === 0) {
+                showToast("No saved stories to export.");
+                return;
+            }
+            const dataStr = JSON.stringify(savedStories, null, 2);
+            const dataBlob = new Blob([dataStr], { type: "application/json" });
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `reddit-storyteller-saved_${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            showToast("Saved stories exported!");
+        }
+
+        function handleImportFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const importedStories = JSON.parse(e.target.result);
+                    if (!Array.isArray(importedStories)) throw new Error("Invalid format.");
+
+                    const existingStories = getSavedStories();
+                    const existingIds = new Set(existingStories.map(s => s.id));
+                    let newStoriesCount = 0;
+
+                    importedStories.forEach(story => {
+                        if (story.id && !existingIds.has(story.id)) {
+                            existingStories.push(story);
+                            newStoriesCount++;
+                        }
+                    });
+
+                    localStorage.setItem(SAVED_STORIES_KEY, JSON.stringify(existingStories));
+                    showToast(`Successfully imported ${newStoriesCount} new stories!`);
+                    if (isShowingSaved) displaySavedStories();
+
+                } catch (error) {
+                    showErrorPopup("Import failed. The file is either corrupted or not in the correct format.");
+                    console.error("Import error:", error);
+                } finally {
+                    // Reset file input to allow re-uploading the same file
+                    importFileInput.value = '';
+                }
+            };
+            reader.readAsText(file);
+        }
 
         function getSubredditHistory() {
             return JSON.parse(localStorage.getItem(SUBREDDIT_HISTORY_KEY)) || [];
         }
 
         function saveSubredditToHistory(subreddit) {
-            if (!subreddit) return;
+            if (!subreddit || subreddit.includes('+')) return;
             let history = getSubredditHistory();
             history = history.filter(item => item.toLowerCase() !== subreddit.toLowerCase());
             history.unshift(subreddit);
@@ -591,4 +762,5 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.innerHTML = "<h1>A critical error occurred. Please refresh the page.</h1>";
     }
 });
+
 
