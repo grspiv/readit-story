@@ -10,13 +10,16 @@
 
     <header class="app-header">
         <h1>Reddit Storyteller</h1>
-        <div class="theme-switcher">
-            <label for="theme-select">Theme:</label>
-            <select id="theme-select" class="dropdown-input">
-                <option value="light">Light</option>
-                <option value="dark">Dark</option>
-                <option value="sepia">Sepia</option>
-            </select>
+        <div class="header-actions">
+            <button id="view-saved-button" class="action-button secondary">Saved Stories</button>
+            <div class="theme-switcher">
+                <label for="theme-select">Theme:</label>
+                <select id="theme-select" class="dropdown-input">
+                    <option value="light">Light</option>
+                    <option value="dark">Dark</option>
+                    <option value="sepia">Sepia</option>
+                </select>
+            </div>
         </div>
     </header>
     
@@ -24,7 +27,7 @@
         <section class="controls">
             <div class="input-group">
                 <label for="subreddit-input">Subreddit:</label>
-                <input type="text" id="subreddit-input" list="subreddit-list" value="AskReddit" class="text-input">
+                <input type="text" id="subreddit-input" list="subreddit-list" value="nosleep" class="text-input">
                 <datalist id="subreddit-list">
                     <option value="AskReddit"></option>
                     <option value="WritingPrompts"></option>
@@ -36,6 +39,11 @@
                     <option value="IDontWorkHereLady"></option>
                 </datalist>
             </div>
+
+            <div class="input-group">
+                <label for="search-input">Search Stories (optional):</label>
+                <input type="text" id="search-input" class="text-input" placeholder="e.g., 'haunted house'">
+            </div>
             
             <div class="input-group">
                 <label for="sort-select">Sort by:</label>
@@ -43,6 +51,7 @@
                     <option value="hot">Hot</option>
                     <option value="new">New</option>
                     <option value="top">Top</option>
+                    <option value="relevance">Relevance</option>
                     <option value="rising">Rising</option>
                 </select>
             </div>
@@ -61,6 +70,7 @@
             <button id="fetch-button" class="action-button">Get Stories</button>
         </section>
 
+        <h2 id="stories-heading" class="stories-heading"></h2>
         <section id="story-container" class="story-container"></section>
 
         <div id="loading-indicator" class="loading-indicator">
@@ -68,7 +78,6 @@
             <span>Loading stories...</span>
         </div>
 
-        <!-- NEW: Container for the load more button -->
         <div class="load-more-container">
             <button id="load-more-button" class="action-button" style="display: none;">Load More Stories</button>
         </div>

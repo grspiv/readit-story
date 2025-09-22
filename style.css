@@ -10,6 +10,10 @@
     --highlight-color: #3498db;
     --accent-color: #9b59b6;
     --meta-text-color: #7f8c8d;
+    --secondary-button-bg: #95a5a6;
+    --secondary-button-hover-bg: #7f8c8d;
+    --save-button-bg: #2ecc71;
+    --save-button-hover-bg: #27ae60;
 }
 
 body.dark {
@@ -20,6 +24,8 @@ body.dark {
     --border-color: #7f8c8d;
     --shadow-color: rgba(0, 0, 0, 0.4);
     --meta-text-color: #bdc3c7;
+    --secondary-button-bg: #576574;
+    --secondary-button-hover-bg: #7f8c8d;
 }
 
 body.sepia {
@@ -72,6 +78,12 @@ body {
     font-size: 2.5em;
     letter-spacing: 2px;
     text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 20px;
 }
 
 .theme-switcher {
@@ -143,10 +155,18 @@ body {
     min-width: 150px;
 }
 
+.action-button.secondary {
+    background-color: var(--secondary-button-bg);
+}
+
 .action-button:hover {
     background-color: var(--button-hover-color);
     transform: translateY(-3px);
     box-shadow: 0 6px 12px rgba(0, 0, 0, 0.25);
+}
+
+.action-button.secondary:hover {
+    background-color: var(--secondary-button-hover-bg);
 }
 
 .action-button:active {
@@ -164,6 +184,12 @@ body {
     100% { transform: scale(1); }
 }
 
+.stories-heading {
+    text-align: center;
+    color: var(--heading-color);
+    margin-bottom: 20px;
+}
+
 .story-container {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -174,12 +200,11 @@ body {
     background-color: var(--card-bg);
     border-radius: 16px;
     box-shadow: 0 6px 12px var(--shadow-color);
-    padding: 25px;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
     transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease, background-color 0.3s ease;
     border: 2px solid transparent;
+    overflow: hidden;
 }
 
 .story-card:hover {
@@ -189,21 +214,20 @@ body {
 }
 
 .story-card-media {
-    margin: -25px -25px 20px -25px;
     overflow: hidden;
-    border-radius: 16px 16px 0 0;
+    max-height: 200px;
 }
 
 .story-card-media img,
 .story-card-media video {
     width: 100%;
-    height: auto;
-    display: block;
-    max-height: 400px;
+    height: 100%;
     object-fit: cover;
+    display: block;
 }
 
 .story-card-content {
+    padding: 25px;
     display: flex;
     flex-direction: column;
     flex-grow: 1;
@@ -234,8 +258,7 @@ body {
 .story-card h3 {
     font-size: 1.4em;
     color: var(--heading-color);
-    margin-top: 0;
-    margin-bottom: 10px;
+    margin: 0 0 10px;
 }
 
 .story-card .author {
@@ -255,26 +278,41 @@ body {
     flex-grow: 1;
 }
 
-.story-card .button-container {
+.story-card-actions {
     margin-top: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.story-card .read-button,
+.story-card .save-button {
+    padding: 10px 18px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    border: none;
+    transition: background-color 0.3s ease, transform 0.2s ease;
 }
 
 .story-card .read-button {
     background-color: var(--button-color);
     color: white;
-    padding: 12px 20px;
-    border: none;
-    border-radius: 20px;
-    font-size: 14px;
-    font-weight: bold;
-    cursor: pointer;
-    align-self: flex-start;
-    transition: background-color 0.3s ease, transform 0.2s ease;
 }
 
 .story-card .read-button:hover {
     background-color: var(--button-hover-color);
     transform: scale(1.05);
+}
+
+.story-card .save-button {
+    background-color: var(--save-button-bg);
+    color: white;
+}
+
+.story-card .save-button.saved {
+    background-color: var(--secondary-button-bg);
 }
 
 .loading-indicator {
