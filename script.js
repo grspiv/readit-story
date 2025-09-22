@@ -92,11 +92,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         function handleViewSavedClick() {
-            isShowingSaved = true;
-            displaySavedStories();
-            viewSavedButton.textContent = 'Back to Browsing';
-            viewSavedButton.classList.add('active');
-            controlsSection.style.display = 'none';
+            if (isShowingSaved) {
+                // We are in the saved stories view, so switch back to browsing.
+                // handleFetchClick() will reset the state and re-fetch the last subreddit.
+                handleFetchClick();
+            } else {
+                // We are browsing, so switch to the saved stories view.
+                isShowingSaved = true;
+                displaySavedStories();
+                viewSavedButton.textContent = 'Back to Browsing';
+                viewSavedButton.classList.add('active');
+                controlsSection.style.display = 'none';
+            }
         }
         
         function handleClearSaved() {
