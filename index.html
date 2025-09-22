@@ -29,14 +29,7 @@
                 <label for="subreddit-input">Subreddit:</label>
                 <input type="text" id="subreddit-input" list="subreddit-list" value="nosleep" class="text-input">
                 <datalist id="subreddit-list">
-                    <option value="AskReddit"></option>
-                    <option value="WritingPrompts"></option>
-                    <option value="TrueOffMyChest"></option>
-                    <option value="TwoSentenceHorror"></option>
-                    <option value="TIFU"></option>
-                    <option value="nosleep"></option>
-                    <option value="MaliciousCompliance"></option>
-                    <option value="IDontWorkHereLady"></option>
+                    <!-- Options will be populated by JavaScript -->
                 </datalist>
             </div>
 
@@ -71,6 +64,9 @@
         </section>
 
         <h2 id="stories-heading" class="stories-heading"></h2>
+        <div id="clear-saved-container" style="text-align: center; margin-bottom: 20px; display: none;">
+            <button id="clear-saved-button" class="action-button secondary">Clear All Saved Stories</button>
+        </div>
         <section id="story-container" class="story-container"></section>
 
         <div id="loading-indicator" class="loading-indicator">
