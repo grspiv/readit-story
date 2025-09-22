@@ -14,7 +14,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const backToTopButton = document.getElementById('back-to-top');
         const timeRangeControls = document.getElementById('time-range-controls');
         const timeRangeSelect = document.getElementById('time-range-select');
-        // NEW: Load More Button
         const loadMoreButton = document.getElementById('load-more-button');
 
         // API Constants
@@ -79,7 +78,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // NEW: Load More button listener
         loadMoreButton.addEventListener('click', () => {
             const subreddit = subredditInput.value.trim();
             const sort = sortSelect.value;
@@ -131,7 +129,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         function showLoading(show, isLoadMore) {
-            // Use loading indicator for initial load, pulse button for "load more"
             if (isLoadMore) {
                 loadingIndicator.style.display = 'none';
                 if (show) loadMoreButton.classList.add('pulse-active');
@@ -149,14 +146,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 storyContainer.innerHTML = '';
                 currentAfterToken = null;
             }
-            // Hide button while fetching new data
             loadMoreButton.style.display = 'none';
 
             let redditUrl = `${REDDIT_API_BASE_URL}${subreddit}/${sort}.json?limit=25`;
             if (sort === 'top') {
                 redditUrl += `&t=${timeRange}`;
             }
-            // Add 'after' token for pagination if we're loading more
             if (loadMore && currentAfterToken) {
                 redditUrl += `&after=${currentAfterToken}`;
             }
@@ -171,7 +166,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 const data = await response.json();
                 const posts = data.data.children;
-                // Update the token for the next page
                 currentAfterToken = data.data.after;
 
                 if (posts.length === 0 && !loadMore) {
@@ -184,26 +178,38 @@ document.addEventListener('DOMContentLoaded', () => {
                 showErrorPopup(`Could not fetch stories. ${error.message}`);
             } finally {
                 showLoading(false, loadMore);
-                // Show "Load More" button if there's a token for a next page
                 if (currentAfterToken) {
                     loadMoreButton.style.display = 'block';
                 }
             }
         }
 
-        async function fetchAndShowComments(title, selftext, storyId, subreddit) {
-            popupTitle.textContent = title;
+        async function fetchAndShowComments(story) {
+            popupTitle.textContent = story.title;
             document.body.style.overflow = 'hidden';
             popupOverlay.classList.add('active');
             popupBody.innerHTML = `<div class="spinner"></div><p class="loading-message">Loading full story and comments...</p>`;
 
             let finalContent = '';
-            if (selftext && selftext.trim().length > 0) {
-                finalContent += `<p>${createClickableLinks(selftext).replace(/\n/g, '<br>')}</p>`;
+
+            // Handle media in the popup
+            if (story.post_hint === 'image') {
+                finalContent += `<div class="popup-media"><img src="${story.url}" alt="${story.title}" onerror="this.parentElement.style.display='none'"></div>`;
+            } else if (story.is_video && story.media && story.media.reddit_video) {
+                 finalContent += `
+                    <div class="popup-media">
+                        <video controls autoplay loop playsinline poster="${story.thumbnail}">
+                            <source src="${story.media.reddit_video.fallback_url}" type="video/mp4">
+                        </video>
+                    </div>`;
+            }
+
+            if (story.selftext && story.selftext.trim().length > 0) {
+                finalContent += `<p>${createClickableLinks(story.selftext).replace(/\n/g, '<br>')}</p>`;
             }
 
             try {
-                const redditUrl = `${REDDIT_API_BASE_URL}${subreddit}/comments/${storyId}.json`;
+                const redditUrl = `${REDDIT_API_BASE_URL}${story.subreddit}/comments/${story.id}.json`;
                 const response = await fetch(redditUrl);
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
@@ -235,18 +241,35 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         function displayStories(posts) {
-            // This function now just appends new stories to the container
             posts.forEach(post => {
                 const story = post.data;
-                const trimmedSelftext = story.selftext ? story.selftext.trim() : '';
-                
-                const previewText = trimmedSelftext.length > 0 ? trimmedSelftext : story.title;
 
-                if (story.is_self) {
-                    const storyCard = document.createElement('div');
-                    storyCard.className = 'story-card';
-                    
-                    storyCard.innerHTML = `
+                // Skip posts that are not self-posts, images, or videos.
+                if (!story.is_self && story.post_hint !== 'image' && !story.is_video) {
+                    return;
+                }
+
+                const storyCard = document.createElement('div');
+                storyCard.className = 'story-card';
+                
+                let mediaHTML = '';
+                if (story.post_hint === 'image') {
+                    mediaHTML = `<div class="story-card-media"><img src="${story.url}" alt="${story.title}" onerror="this.style.display='none'"></div>`;
+                } else if (story.is_video && story.media && story.media.reddit_video) {
+                     mediaHTML = `
+                        <div class="story-card-media">
+                            <video controls muted loop playsinline poster="${story.thumbnail}">
+                                <source src="${story.media.reddit_video.fallback_url}" type="video/mp4">
+                            </video>
+                        </div>`;
+                }
+
+                const trimmedSelftext = story.selftext ? story.selftext.trim() : '';
+                const previewText = trimmedSelftext.substring(0, 250) + (trimmedSelftext.length > 250 ? '...' : '');
+                
+                storyCard.innerHTML = `
+                    ${mediaHTML}
+                    <div class="story-card-content">
                         <div class="story-meta">
                             <span>
                                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M12 2L2 12h5v10h10V12h5L12 2z"/></svg>
@@ -259,20 +282,20 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                         <h3>${story.title}</h3>
                         <p class="author">by u/${story.author}</p>
-                        <p class="preview">${previewText}</p>
+                        ${previewText ? `<p class="preview">${previewText}</p>` : ''}
                         <div class="button-container">
                             <button class="read-button">Read Full Story</button>
                         </div>
-                    `;
-                    
-                    const readButton = storyCard.querySelector('.read-button');
-                    
-                    readButton.addEventListener('click', () => {
-                        fetchAndShowComments(story.title, trimmedSelftext, story.id, story.subreddit);
-                    });
-                    
-                    storyContainer.appendChild(storyCard);
-                }
+                    </div>
+                `;
+                
+                const readButton = storyCard.querySelector('.read-button');
+                
+                readButton.addEventListener('click', () => {
+                    fetchAndShowComments(story);
+                });
+                
+                storyContainer.appendChild(storyCard);
             });
         }
     } catch (e) {
