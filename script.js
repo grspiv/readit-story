@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const loadingIndicator = document.getElementById('loading-indicator');
         const popupOverlay = document.getElementById('popup-overlay');
         const popupTitle = document.getElementById('popup-title');
+        const popupControls = document.querySelector('.popup-controls');
         const popupBody = document.getElementById('popup-body');
         const closePopupButton = document.getElementById('close-popup');
         const themeSelect = document.getElementById('theme-select');
@@ -25,11 +26,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const flairFilterInput = document.getElementById('flair-filter-input');
         const filterSection = document.getElementById('filter-section');
         const toastNotification = document.getElementById('toast-notification');
+        const layoutToggleButton = document.getElementById('layout-toggle-button');
+        const layoutIconGrid = document.getElementById('layout-icon-grid');
+        const layoutIconList = document.getElementById('layout-icon-list');
 
         // --- Constants & State ---
         const REDDIT_API_BASE_URL = 'https://www.reddit.com/r/';
         const SAVED_STORIES_KEY = 'redditStorytellerSaved';
         const SUBREDDIT_HISTORY_KEY = 'redditStorytellerHistory';
+        const LAYOUT_PREFERENCE_KEY = 'redditStorytellerLayout';
         const RANDOM_SUBREDDITS = ['nosleep', 'LetsNotMeet', 'glitch_in_the_matrix', 'tifu', 'confession', 'maliciouscompliance', 'talesfromtechsupport', 'WritingPrompts', 'shortscarystories', 'UnresolvedMysteries'];
         let currentAfterToken = null;
         let isShowingSaved = false;
@@ -37,12 +42,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // --- Initialization ---
         const savedTheme = localStorage.getItem('theme') || 'light';
+        const savedLayout = localStorage.getItem(LAYOUT_PREFERENCE_KEY) || 'grid';
         applyTheme(savedTheme);
+        applyLayout(savedLayout);
         populateSubredditHistory();
         fetchStories(subredditInput.value, 'hot', 'all', false);
 
         // --- Event Listeners ---
         themeSelect.addEventListener('change', () => applyTheme(themeSelect.value));
+        layoutToggleButton.addEventListener('click', handleLayoutToggle);
         fetchButton.addEventListener('click', handleFetchClick);
         randomButton.addEventListener('click', handleRandomClick);
         loadMoreButton.addEventListener('click', handleLoadMoreClick);
@@ -61,6 +69,24 @@ document.addEventListener('DOMContentLoaded', () => {
             if (theme !== 'light') document.body.classList.add(theme);
             localStorage.setItem('theme', theme);
             themeSelect.value = theme;
+        }
+        
+        function applyLayout(layout) {
+            if (layout === 'list') {
+                storyContainer.classList.add('list-view');
+                layoutIconGrid.style.display = 'none';
+                layoutIconList.style.display = 'block';
+            } else {
+                storyContainer.classList.remove('list-view');
+                layoutIconGrid.style.display = 'block';
+                layoutIconList.style.display = 'none';
+            }
+            localStorage.setItem(LAYOUT_PREFERENCE_KEY, layout);
+        }
+        
+        function handleLayoutToggle() {
+            const isListView = storyContainer.classList.contains('list-view');
+            applyLayout(isListView ? 'grid' : 'list');
         }
 
         function handleFetchClick() {
@@ -125,6 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         function closePopup() {
+            window.speechSynthesis.cancel(); // Stop any speech on close
             popupOverlay.classList.remove('active');
             document.body.style.overflow = 'auto';
             const video = popupBody.querySelector('video');
@@ -216,7 +243,21 @@ document.addEventListener('DOMContentLoaded', () => {
             popupTitle.textContent = story.title;
             const header = popupTitle.parentElement;
             
-            // Clear previous actions and add new ones
+            popupControls.innerHTML = `
+                <button id="read-aloud-button" class="action-button secondary">Read Aloud</button>
+                <button id="stop-reading-button" class="action-button" style="display:none;">Stop Reading</button>
+            `;
+
+            const readAloudButton = document.getElementById('read-aloud-button');
+            const stopReadingButton = document.getElementById('stop-reading-button');
+
+            readAloudButton.addEventListener('click', () => handleReadAloud(story));
+            stopReadingButton.addEventListener('click', () => {
+                window.speechSynthesis.cancel();
+                readAloudButton.style.display = 'inline-block';
+                stopReadingButton.style.display = 'none';
+            });
+            
             let headerActions = header.querySelector('.popup-header-actions');
             if (!headerActions) {
                 headerActions = document.createElement('div');
@@ -227,7 +268,6 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const redditLink = `https://www.reddit.com${story.permalink}`;
             
-            // Add Share button
             const shareBtn = document.createElement('button');
             shareBtn.className = 'icon-button';
             shareBtn.title = 'Copy Link';
@@ -238,7 +278,6 @@ document.addEventListener('DOMContentLoaded', () => {
             };
             headerActions.appendChild(shareBtn);
 
-            // Add External Link button
             const linkEl = document.createElement('a');
             linkEl.href = redditLink;
             linkEl.target = '_blank';
@@ -268,7 +307,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (comments.length > 0) {
                     finalContent += `<h4>Top Comments:</h4>`;
                     finalContent += comments.map(c => c.data).filter(c => c.body).map(c => `
-                        <div class="comment-card">
+                        <div class="comment-card" data-comment-author="${c.author}">
                             <p class="comment-author">u/${c.author}</p>
                             <p class="comment-body">${c.body.replace(/\n/g, '<br>')}</p>
                         </div>`
@@ -302,11 +341,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         function displayStories(stories) {
-            stories.forEach(story => {
+            stories.forEach((story, index) => {
                 const storyCard = document.createElement('div');
                 storyCard.className = 'story-card';
+                storyCard.style.animationDelay = `${index * 0.05}s`;
                 const isSaved = isStorySaved(story.id);
                 const redditLink = `https://www.reddit.com${story.permalink}`;
+                const readingTime = calculateReadingTime(story.selftext);
 
                 storyCard.innerHTML = `
                     ${createMediaElement(story, false)}
@@ -318,6 +359,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                         <h3><a href="${redditLink}" target="_blank" rel="noopener noreferrer">${story.title}</a></h3>
                         <p class="author">by <a href="https://www.reddit.com/user/${story.author}" target="_blank" rel="noopener noreferrer">u/${story.author}</a></p>
+                        <p class="reading-time">${readingTime}</p>
                         <p class="preview">${story.selftext ? story.selftext.substring(0, 150) + '...' : ''}</p>
                         <div class="story-card-actions">
                             <button class="read-button">Read Story</button>
@@ -352,6 +394,51 @@ document.addEventListener('DOMContentLoaded', () => {
                 return `<div class="${isPopup ? 'popup' : 'story-card'}-media"><video ${commonAttrs} poster="${story.thumbnail}"><source src="${story.media.reddit_video.fallback_url}" type="video/mp4"></video></div>`;
             }
             return '';
+        }
+        
+        function calculateReadingTime(text) {
+            if (!text) return '1 min read';
+            const wordsPerMinute = 225;
+            const words = text.trim().split(/\s+/).length;
+            const time = Math.ceil(words / wordsPerMinute);
+            return `${time} min read`;
+        }
+        
+        function handleReadAloud(story) {
+            const readAloudButton = document.getElementById('read-aloud-button');
+            const stopReadingButton = document.getElementById('stop-reading-button');
+            
+            // Stop any previous speech
+            window.speechSynthesis.cancel();
+
+            let textToRead = `Title: ${story.title}. By user ${story.author}. ${story.selftext}. `;
+            const comments = popupBody.querySelectorAll('.comment-card');
+            if (comments.length > 0) {
+                textToRead += " Now for the top comments. ";
+                comments.forEach(comment => {
+                    const author = comment.dataset.commentAuthor;
+                    const body = comment.querySelector('.comment-body').textContent;
+                    textToRead += `Comment from user ${author}. ${body}. `;
+                });
+            }
+
+            const utterance = new SpeechSynthesisUtterance(textToRead);
+            utterance.onstart = () => {
+                readAloudButton.style.display = 'none';
+                stopReadingButton.style.display = 'inline-block';
+            };
+            utterance.onend = () => {
+                readAloudButton.style.display = 'inline-block';
+                stopReadingButton.style.display = 'none';
+            };
+            utterance.onerror = (event) => {
+                console.error('Speech synthesis error:', event.error);
+                showToast('Sorry, text-to-speech is not available.');
+                readAloudButton.style.display = 'inline-block';
+                stopReadingButton.style.display = 'none';
+            };
+
+            window.speechSynthesis.speak(utterance);
         }
 
         // --- Saved Stories & History Functions ---
