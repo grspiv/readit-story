@@ -2,6 +2,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
         // --- DOM Elements ---
         const fetchButton = document.getElementById('fetch-button');
+        const randomButton = document.getElementById('random-button');
         const subredditInput = document.getElementById('subreddit-input');
         const searchInput = document.getElementById('search-input');
         const sortSelect = document.getElementById('sort-select');
@@ -21,13 +22,18 @@ document.addEventListener('DOMContentLoaded', () => {
         const controlsSection = document.querySelector('.controls');
         const clearSavedButton = document.getElementById('clear-saved-button');
         const clearSavedContainer = document.getElementById('clear-saved-container');
+        const flairFilterInput = document.getElementById('flair-filter-input');
+        const filterSection = document.getElementById('filter-section');
+        const toastNotification = document.getElementById('toast-notification');
 
         // --- Constants & State ---
         const REDDIT_API_BASE_URL = 'https://www.reddit.com/r/';
         const SAVED_STORIES_KEY = 'redditStorytellerSaved';
         const SUBREDDIT_HISTORY_KEY = 'redditStorytellerHistory';
+        const RANDOM_SUBREDDITS = ['nosleep', 'LetsNotMeet', 'glitch_in_the_matrix', 'tifu', 'confession', 'maliciouscompliance', 'talesfromtechsupport', 'WritingPrompts', 'shortscarystories', 'UnresolvedMysteries'];
         let currentAfterToken = null;
         let isShowingSaved = false;
+        let allFetchedPosts = [];
 
         // --- Initialization ---
         const savedTheme = localStorage.getItem('theme') || 'light';
@@ -38,10 +44,12 @@ document.addEventListener('DOMContentLoaded', () => {
         // --- Event Listeners ---
         themeSelect.addEventListener('change', () => applyTheme(themeSelect.value));
         fetchButton.addEventListener('click', handleFetchClick);
+        randomButton.addEventListener('click', handleRandomClick);
         loadMoreButton.addEventListener('click', handleLoadMoreClick);
         sortSelect.addEventListener('change', handleSortChange);
         viewSavedButton.addEventListener('click', handleViewSavedClick);
         clearSavedButton.addEventListener('click', handleClearSaved);
+        flairFilterInput.addEventListener('input', () => renderStories(allFetchedPosts));
         closePopupButton.addEventListener('click', closePopup);
         popupOverlay.addEventListener('click', (e) => e.target === popupOverlay && closePopup());
         window.onscroll = handleScroll;
@@ -73,6 +81,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 showErrorPopup("Please enter a subreddit name.");
             }
         }
+        
+        function handleRandomClick() {
+            const randomSub = RANDOM_SUBREDDITS[Math.floor(Math.random() * RANDOM_SUBREDDITS.length)];
+            subredditInput.value = randomSub;
+            searchInput.value = '';
+            handleFetchClick();
+        }
 
         function handleLoadMoreClick() {
             const subreddit = subredditInput.value.trim();
@@ -93,16 +108,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
         function handleViewSavedClick() {
             if (isShowingSaved) {
-                // We are in the saved stories view, so switch back to browsing.
-                // handleFetchClick() will reset the state and re-fetch the last subreddit.
                 handleFetchClick();
             } else {
-                // We are browsing, so switch to the saved stories view.
                 isShowingSaved = true;
                 displaySavedStories();
                 viewSavedButton.textContent = 'Back to Browsing';
                 viewSavedButton.classList.add('active');
                 controlsSection.style.display = 'none';
+                filterSection.style.display = 'none';
             }
         }
         
@@ -134,6 +147,14 @@ document.addEventListener('DOMContentLoaded', () => {
             popupOverlay.classList.add('active');
             document.body.style.overflow = 'hidden';
         }
+        
+        function showToast(message) {
+            toastNotification.textContent = message;
+            toastNotification.classList.add('show');
+            setTimeout(() => {
+                toastNotification.classList.remove('show');
+            }, 2500);
+        }
 
         function showLoading(show, isLoadMore) {
             if (isLoadMore) {
@@ -150,8 +171,9 @@ document.addEventListener('DOMContentLoaded', () => {
         async function fetchStories(subreddit, sort, timeRange = 'all', loadMore = false, query = '') {
             if (!loadMore) {
                 saveSubredditToHistory(subreddit);
-                storyContainer.innerHTML = '';
+                allFetchedPosts = [];
                 currentAfterToken = null;
+                flairFilterInput.value = '';
             }
             showLoading(true, loadMore);
             loadMoreButton.style.display = 'none';
@@ -172,17 +194,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 const response = await fetch(redditUrl);
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const data = await response.json();
-                const posts = data.data.children;
+                const newPosts = data.data.children.map(p => p.data);
+                allFetchedPosts = allFetchedPosts.concat(newPosts);
                 currentAfterToken = data.data.after;
 
-                if (posts.length === 0 && !loadMore) {
-                    storyContainer.innerHTML = `<p>No stories found. Please try a different search or subreddit.</p>`;
-                } else {
-                    displayStories(posts.map(p => p.data));
-                }
+                renderStories(allFetchedPosts);
+
             } catch (error) {
                 console.error("Failed to fetch stories:", error);
                 showErrorPopup(`Could not fetch stories. ${error.message}`);
+                storyContainer.innerHTML = '';
             } finally {
                 showLoading(false, loadMore);
                 if (currentAfterToken && !isShowingSaved) {
@@ -194,18 +215,38 @@ document.addEventListener('DOMContentLoaded', () => {
         async function fetchAndShowComments(story) {
             popupTitle.textContent = story.title;
             const header = popupTitle.parentElement;
-            const oldLink = header.querySelector('.popup-external-link');
-            if (oldLink) oldLink.remove();
+            
+            // Clear previous actions and add new ones
+            let headerActions = header.querySelector('.popup-header-actions');
+            if (!headerActions) {
+                headerActions = document.createElement('div');
+                headerActions.className = 'popup-header-actions';
+                header.insertBefore(headerActions, closePopupButton);
+            }
+            headerActions.innerHTML = '';
             
             const redditLink = `https://www.reddit.com${story.permalink}`;
+            
+            // Add Share button
+            const shareBtn = document.createElement('button');
+            shareBtn.className = 'icon-button';
+            shareBtn.title = 'Copy Link';
+            shareBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>`;
+            shareBtn.onclick = () => {
+                navigator.clipboard.writeText(redditLink);
+                showToast('Link copied to clipboard!');
+            };
+            headerActions.appendChild(shareBtn);
+
+            // Add External Link button
             const linkEl = document.createElement('a');
             linkEl.href = redditLink;
             linkEl.target = '_blank';
             linkEl.rel = 'noopener noreferrer';
-            linkEl.className = 'popup-external-link';
+            linkEl.className = 'icon-button';
             linkEl.title = 'View on Reddit';
             linkEl.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>`;
-            header.insertBefore(linkEl, closePopupButton);
+            headerActions.appendChild(linkEl);
 
             document.body.style.overflow = 'hidden';
             popupOverlay.classList.add('active');
@@ -243,6 +284,23 @@ document.addEventListener('DOMContentLoaded', () => {
             popupBody.innerHTML = finalContent;
         }
 
+        function renderStories(posts) {
+            storyContainer.innerHTML = '';
+            const flairFilter = flairFilterInput.value.trim().toLowerCase();
+            const filteredPosts = flairFilter 
+                ? posts.filter(story => story.link_flair_text && story.link_flair_text.toLowerCase().includes(flairFilter))
+                : posts;
+
+            if (filteredPosts.length === 0) {
+                storyContainer.innerHTML = `<p>No stories found with the current filters.</p>`;
+            } else {
+                displayStories(filteredPosts);
+            }
+
+            const hasAnyFlair = posts.some(p => p.link_flair_text);
+            filterSection.style.display = hasAnyFlair ? 'flex' : 'none';
+        }
+
         function displayStories(stories) {
             stories.forEach(story => {
                 const storyCard = document.createElement('div');
@@ -256,6 +314,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div class="story-meta">
                             <span><svg viewBox="0 0 24 24"><path d="M12 2L2 12h5v10h10V12h5L12 2z"/></svg>${story.score.toLocaleString()}</span>
                             <span><svg viewBox="0 0 24 24"><path d="M21.99 4c0-1.1-.89-2-1.99-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14l4 4-.01-18z"/></svg>${story.num_comments.toLocaleString()}</span>
+                            ${story.link_flair_text ? `<span class="story-flair">${story.link_flair_text}</span>` : ''}
                         </div>
                         <h3><a href="${redditLink}" target="_blank" rel="noopener noreferrer">${story.title}</a></h3>
                         <p class="author">by <a href="https://www.reddit.com/user/${story.author}" target="_blank" rel="noopener noreferrer">u/${story.author}</a></p>
@@ -263,7 +322,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div class="story-card-actions">
                             <button class="read-button">Read Story</button>
                             <div class="action-buttons">
-                                <a href="${redditLink}" target="_blank" rel="noopener noreferrer" class="external-link-button" title="View on Reddit">
+                                <button class="icon-button share-button" title="Copy Link">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>
+                                </button>
+                                <a href="${redditLink}" target="_blank" rel="noopener noreferrer" class="icon-button" title="View on Reddit">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
                                 </a>
                                 <button class="save-button ${isSaved ? 'saved' : ''}">${isSaved ? 'Saved' : 'Save'}</button>
@@ -273,6 +335,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 storyCard.querySelector('.read-button').addEventListener('click', () => fetchAndShowComments(story));
                 storyCard.querySelector('.save-button').addEventListener('click', (e) => toggleSaveStory(e, story));
+                storyCard.querySelector('.share-button').addEventListener('click', () => {
+                    navigator.clipboard.writeText(redditLink);
+                    showToast('Link copied to clipboard!');
+                });
                 
                 storyContainer.appendChild(storyCard);
             });
@@ -318,11 +384,11 @@ document.addEventListener('DOMContentLoaded', () => {
         function displaySavedStories() {
             storyContainer.innerHTML = '';
             loadMoreButton.style.display = 'none';
-            const savedStories = getSavedStories();
-            storiesHeading.textContent = `You have ${savedStories.length} saved stor${savedStories.length === 1 ? 'y' : 'ies'}`;
-            if (savedStories.length > 0) {
+            allFetchedPosts = getSavedStories();
+            storiesHeading.textContent = `You have ${allFetchedPosts.length} saved stor${allFetchedPosts.length === 1 ? 'y' : 'ies'}`;
+            if (allFetchedPosts.length > 0) {
                 clearSavedContainer.style.display = 'block';
-                displayStories(savedStories);
+                displayStories(allFetchedPosts);
             } else {
                 clearSavedContainer.style.display = 'none';
                 storyContainer.innerHTML = `<p>You haven't saved any stories yet.</p>`;

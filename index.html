@@ -59,8 +59,17 @@
                     <option value="day">Past 24 Hours</option>
                 </select>
             </div>
-
-            <button id="fetch-button" class="action-button">Get Stories</button>
+            <div class="control-buttons">
+                <button id="fetch-button" class="action-button">Get Stories</button>
+                <button id="random-button" class="action-button secondary">Random</button>
+            </div>
+        </section>
+        
+        <section id="filter-section" class="filter-controls" style="display: none;">
+            <div class="input-group">
+                <label for="flair-filter-input">Filter by Flair:</label>
+                <input type="text" id="flair-filter-input" class="text-input" placeholder="e.g., 'Series'">
+            </div>
         </section>
 
         <h2 id="stories-heading" class="stories-heading"></h2>
@@ -96,6 +105,8 @@
     <button id="back-to-top" class="back-to-top" title="Go to top">
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
     </button>
+
+    <div id="toast-notification" class="toast"></div>
 
     <script src="script.js"></script>
 </body>
