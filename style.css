@@ -14,6 +14,7 @@
     --secondary-button-hover-bg: #7f8c8d;
     --save-button-bg: #2ecc71;
     --save-button-hover-bg: #27ae60;
+    --highlight-bg-color: rgba(255, 255, 0, 0.4);
 }
 
 body.dark {
@@ -26,6 +27,7 @@ body.dark {
     --meta-text-color: #bdc3c7;
     --secondary-button-bg: #576574;
     --secondary-button-hover-bg: #7f8c8d;
+    --highlight-bg-color: rgba(255, 233, 3, 0.5);
 }
 
 body.sepia {
@@ -38,6 +40,7 @@ body.sepia {
     --border-color: #d1c7b7;
     --shadow-color: rgba(88, 80, 64, 0.2);
     --meta-text-color: #93a1a1;
+    --highlight-bg-color: rgba(181, 139, 0, 0.3);
 }
 
 body {
@@ -108,6 +111,63 @@ body {
     font-weight: bold;
 }
 
+.header-toggle-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.toggle-label {
+    font-weight: bold;
+    font-size: 0.9em;
+    cursor: pointer;
+}
+
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 28px;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(255, 255, 255, 0.3);
+    transition: .4s;
+    border-radius: 28px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 20px;
+    width: 20px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+input:checked + .slider {
+    background-color: var(--save-button-bg);
+}
+
+input:checked + .slider:before {
+    transform: translateX(22px);
+}
+
 .main-content {
     max-width: 1200px;
     margin: 0 auto;
@@ -123,10 +183,16 @@ body {
     margin-bottom: 20px;
 }
 
-.filter-controls {
+.secondary-controls {
     display: flex;
     justify-content: center;
     margin-bottom: 40px;
+    gap: 15px;
+}
+
+.filter-controls {
+    display: flex;
+    justify-content: center;
 }
 
 .input-group {
@@ -241,7 +307,44 @@ body {
     overflow: hidden;
     opacity: 0;
     animation: fadeIn 0.5s ease forwards;
+    position: relative;
 }
+
+.story-card.nsfw-blur .story-card-content,
+.story-card.nsfw-blur .story-card-media {
+    filter: blur(20px);
+    pointer-events: none;
+}
+
+.nsfw-uncover {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+    color: white;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    cursor: pointer;
+    z-index: 2;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+.nsfw-uncover h4 {
+    margin: 0 0 10px;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+}
+
+.nsfw-uncover p {
+    margin: 0;
+    font-size: 0.9em;
+}
+
 
 @keyframes fadeIn {
     to {
@@ -585,6 +688,12 @@ body {
     color: var(--text-color);
 }
 
+.popup-body .highlight {
+    background-color: var(--highlight-bg-color);
+    border-radius: 3px;
+    padding: 0 2px;
+}
+
 .popup-media {
     margin-bottom: 20px;
 }
@@ -691,7 +800,7 @@ body {
         gap: 15px;
     }
 
-    .controls {
+    .controls, .secondary-controls {
         flex-direction: column;
         align-items: stretch;
     }

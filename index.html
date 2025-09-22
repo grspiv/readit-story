@@ -11,6 +11,13 @@
     <header class="app-header">
         <h1>Reddit Storyteller</h1>
         <div class="header-actions">
+            <div class="header-toggle-group">
+                <label class="toggle-switch">
+                    <input type="checkbox" id="nsfw-toggle">
+                    <span class="slider"></span>
+                </label>
+                <label for="nsfw-toggle" class="toggle-label">Blur NSFW/Spoiler</label>
+            </div>
             <button id="layout-toggle-button" class="icon-button" title="Toggle Layout">
                 <svg id="layout-icon-grid" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect></svg>
                 <svg id="layout-icon-list" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
@@ -30,7 +37,7 @@
     <main class="main-content">
         <section class="controls">
             <div class="input-group">
-                <label for="subreddit-input">Subreddit:</label>
+                <label for="subreddit-input">Subreddit (use '+' for multi):</label>
                 <input type="text" id="subreddit-input" list="subreddit-list" value="nosleep" class="text-input">
                 <datalist id="subreddit-list">
                     <!-- Options will be populated by JavaScript -->
@@ -69,10 +76,23 @@
             </div>
         </section>
         
-        <section id="filter-section" class="filter-controls" style="display: none;">
-            <div class="input-group">
-                <label for="flair-filter-input">Filter by Flair:</label>
-                <input type="text" id="flair-filter-input" class="text-input" placeholder="e.g., 'Series'">
+        <section id="secondary-controls-container" class="secondary-controls">
+            <div id="filter-section" class="filter-controls" style="display: none;">
+                <div class="input-group">
+                    <label for="flair-filter-input">Filter by Flair:</label>
+                    <input type="text" id="flair-filter-input" class="text-input" placeholder="e.g., 'Series'">
+                </div>
+            </div>
+            <div id="saved-sort-section" class="filter-controls" style="display: none;">
+                <div class="input-group">
+                    <label for="saved-sort-select">Sort Saved Stories:</label>
+                    <select id="saved-sort-select" class="dropdown-input">
+                        <option value="date-desc">Newest Saved</option>
+                        <option value="date-asc">Oldest Saved</option>
+                        <option value="score-desc">Highest Score</option>
+                        <option value="subreddit-az">Subreddit (A-Z)</option>
+                    </select>
+                </div>
             </div>
         </section>
 

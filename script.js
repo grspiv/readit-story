@@ -25,38 +25,48 @@ document.addEventListener('DOMContentLoaded', () => {
         const clearSavedContainer = document.getElementById('clear-saved-container');
         const flairFilterInput = document.getElementById('flair-filter-input');
         const filterSection = document.getElementById('filter-section');
+        const savedSortSection = document.getElementById('saved-sort-section');
+        const savedSortSelect = document.getElementById('saved-sort-select');
         const toastNotification = document.getElementById('toast-notification');
         const layoutToggleButton = document.getElementById('layout-toggle-button');
         const layoutIconGrid = document.getElementById('layout-icon-grid');
         const layoutIconList = document.getElementById('layout-icon-list');
+        const nsfwToggle = document.getElementById('nsfw-toggle');
 
         // --- Constants & State ---
         const REDDIT_API_BASE_URL = 'https://www.reddit.com/r/';
         const SAVED_STORIES_KEY = 'redditStorytellerSaved';
         const SUBREDDIT_HISTORY_KEY = 'redditStorytellerHistory';
         const LAYOUT_PREFERENCE_KEY = 'redditStorytellerLayout';
+        const NSFW_PREFERENCE_KEY = 'redditStorytellerNSFW';
         const RANDOM_SUBREDDITS = ['nosleep', 'LetsNotMeet', 'glitch_in_the_matrix', 'tifu', 'confession', 'maliciouscompliance', 'talesfromtechsupport', 'WritingPrompts', 'shortscarystories', 'UnresolvedMysteries'];
         let currentAfterToken = null;
         let isShowingSaved = false;
         let allFetchedPosts = [];
+        let currentSearchQuery = '';
 
         // --- Initialization ---
         const savedTheme = localStorage.getItem('theme') || 'light';
         const savedLayout = localStorage.getItem(LAYOUT_PREFERENCE_KEY) || 'grid';
+        const savedNSFWPreference = localStorage.getItem(NSFW_PREFERENCE_KEY) === 'true';
+        
         applyTheme(savedTheme);
         applyLayout(savedLayout);
+        applyNSFWPreference(savedNSFWPreference);
         populateSubredditHistory();
         fetchStories(subredditInput.value, 'hot', 'all', false);
 
         // --- Event Listeners ---
         themeSelect.addEventListener('change', () => applyTheme(themeSelect.value));
         layoutToggleButton.addEventListener('click', handleLayoutToggle);
+        nsfwToggle.addEventListener('change', () => applyNSFWPreference(nsfwToggle.checked, true));
         fetchButton.addEventListener('click', handleFetchClick);
         randomButton.addEventListener('click', handleRandomClick);
         loadMoreButton.addEventListener('click', handleLoadMoreClick);
         sortSelect.addEventListener('change', handleSortChange);
         viewSavedButton.addEventListener('click', handleViewSavedClick);
         clearSavedButton.addEventListener('click', handleClearSaved);
+        savedSortSelect.addEventListener('change', displaySavedStories);
         flairFilterInput.addEventListener('input', () => renderStories(allFetchedPosts));
         closePopupButton.addEventListener('click', closePopup);
         popupOverlay.addEventListener('click', (e) => e.target === popupOverlay && closePopup());
@@ -83,6 +93,14 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             localStorage.setItem(LAYOUT_PREFERENCE_KEY, layout);
         }
+
+        function applyNSFWPreference(isBlurred, shouldRender = false) {
+            nsfwToggle.checked = isBlurred;
+            localStorage.setItem(NSFW_PREFERENCE_KEY, isBlurred);
+            if (shouldRender) {
+                renderStories(allFetchedPosts);
+            }
+        }
         
         function handleLayoutToggle() {
             const isListView = storyContainer.classList.contains('list-view');
@@ -95,14 +113,16 @@ document.addEventListener('DOMContentLoaded', () => {
             viewSavedButton.classList.remove('active');
             controlsSection.style.display = 'flex';
             clearSavedContainer.style.display = 'none';
+            savedSortSection.style.display = 'none';
+
 
             const subreddit = subredditInput.value.trim();
             const sort = sortSelect.value;
             const timeRange = timeRangeSelect.value;
-            const query = searchInput.value.trim();
+            currentSearchQuery = searchInput.value.trim();
 
             if (subreddit) {
-                fetchStories(subreddit, sort, timeRange, false, query);
+                fetchStories(subreddit, sort, timeRange, false, currentSearchQuery);
             } else {
                 showErrorPopup("Please enter a subreddit name.");
             }
@@ -119,10 +139,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const subreddit = subredditInput.value.trim();
             const sort = sortSelect.value;
             const timeRange = timeRangeSelect.value;
-            const query = searchInput.value.trim();
 
             if (subreddit && currentAfterToken) {
-                fetchStories(subreddit, sort, timeRange, true, query);
+                fetchStories(subreddit, sort, timeRange, true, currentSearchQuery);
             }
         }
 
@@ -142,12 +161,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 viewSavedButton.classList.add('active');
                 controlsSection.style.display = 'none';
                 filterSection.style.display = 'none';
+                savedSortSection.style.display = 'flex';
             }
         }
         
         function handleClearSaved() {
-            localStorage.removeItem(SAVED_STORIES_KEY);
-            displaySavedStories();
+            if (confirm("Are you sure you want to delete all saved stories? This cannot be undone.")) {
+                localStorage.removeItem(SAVED_STORIES_KEY);
+                displaySavedStories();
+            }
         }
 
         function closePopup() {
@@ -290,10 +312,15 @@ document.addEventListener('DOMContentLoaded', () => {
             document.body.style.overflow = 'hidden';
             popupOverlay.classList.add('active');
             popupBody.innerHTML = `<div class="spinner"></div><p class="loading-message">Loading story...</p>`;
+            
+            let storyText = story.selftext || '';
+            if (currentSearchQuery) {
+                storyText = highlightKeywords(storyText, currentSearchQuery);
+            }
 
             let finalContent = createMediaElement(story, true);
-            if (story.selftext) {
-                finalContent += `<p>${story.selftext.replace(/\n/g, '<br>')}</p>`;
+            if (storyText) {
+                finalContent += `<p>${storyText.replace(/\n/g, '<br>')}</p>`;
             }
 
             try {
@@ -306,12 +333,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 finalContent += `<hr>`;
                 if (comments.length > 0) {
                     finalContent += `<h4>Top Comments:</h4>`;
-                    finalContent += comments.map(c => c.data).filter(c => c.body).map(c => `
+                    finalContent += comments.map(c => c.data).filter(c => c.body).map(c => {
+                        let commentBody = c.body;
+                        if (currentSearchQuery) {
+                           commentBody = highlightKeywords(commentBody, currentSearchQuery);
+                        }
+                        return `
                         <div class="comment-card" data-comment-author="${c.author}">
                             <p class="comment-author">u/${c.author}</p>
-                            <p class="comment-body">${c.body.replace(/\n/g, '<br>')}</p>
+                            <p class="comment-body">${commentBody.replace(/\n/g, '<br>')}</p>
                         </div>`
-                    ).join('');
+                    }).join('');
                 } else {
                     finalContent += `<p>No comments found.</p>`;
                 }
@@ -331,16 +363,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 : posts;
 
             if (filteredPosts.length === 0) {
-                storyContainer.innerHTML = `<p>No stories found with the current filters.</p>`;
+                storyContainer.innerHTML = `<p class="empty-state">No stories found with the current filters.</p>`;
             } else {
                 displayStories(filteredPosts);
             }
 
             const hasAnyFlair = posts.some(p => p.link_flair_text);
-            filterSection.style.display = hasAnyFlair ? 'flex' : 'none';
+            filterSection.style.display = !isShowingSaved && hasAnyFlair ? 'flex' : 'none';
         }
 
         function displayStories(stories) {
+            const shouldBlur = nsfwToggle.checked;
+
             stories.forEach((story, index) => {
                 const storyCard = document.createElement('div');
                 storyCard.className = 'story-card';
@@ -348,8 +382,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 const isSaved = isStorySaved(story.id);
                 const redditLink = `https://www.reddit.com${story.permalink}`;
                 const readingTime = calculateReadingTime(story.selftext);
+                const isSensitive = story.over_18 || story.spoiler;
 
-                storyCard.innerHTML = `
+                if (shouldBlur && isSensitive) {
+                    storyCard.classList.add('nsfw-blur');
+                    const uncoverDiv = document.createElement('div');
+                    uncoverDiv.className = 'nsfw-uncover';
+                    uncoverDiv.innerHTML = `
+                        <h4>${story.over_18 ? 'NSFW Content' : 'Spoiler'}</h4>
+                        <p>Click to reveal</p>
+                    `;
+                    uncoverDiv.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        storyCard.classList.remove('nsfw-blur');
+                        uncoverDiv.remove();
+                    }, { once: true });
+                    storyCard.appendChild(uncoverDiv);
+                }
+
+                storyCard.innerHTML += `
                     ${createMediaElement(story, false)}
                     <div class="story-card-content">
                         <div class="story-meta">
@@ -404,11 +455,16 @@ document.addEventListener('DOMContentLoaded', () => {
             return `${time} min read`;
         }
         
+        function highlightKeywords(text, query) {
+            const keywords = query.split(' ').filter(Boolean);
+            const regex = new RegExp(`(${keywords.join('|')})`, 'gi');
+            return text.replace(regex, `<span class="highlight">$1</span>`);
+        }
+
         function handleReadAloud(story) {
             const readAloudButton = document.getElementById('read-aloud-button');
             const stopReadingButton = document.getElementById('stop-reading-button');
             
-            // Stop any previous speech
             window.speechSynthesis.cancel();
 
             let textToRead = `Title: ${story.title}. By user ${story.author}. ${story.selftext}. `;
@@ -452,7 +508,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 button.textContent = 'Save';
                 button.classList.remove('saved');
             } else {
-                savedStories.push(story);
+                const storyToSave = { ...story, dateSaved: new Date().toISOString() };
+                savedStories.push(storyToSave);
                 button.textContent = 'Saved';
                 button.classList.add('saved');
             }
@@ -471,14 +528,34 @@ document.addEventListener('DOMContentLoaded', () => {
         function displaySavedStories() {
             storyContainer.innerHTML = '';
             loadMoreButton.style.display = 'none';
-            allFetchedPosts = getSavedStories();
+            
+            let savedStories = getSavedStories();
+            const sortMethod = savedSortSelect.value;
+            
+            switch (sortMethod) {
+                case 'date-desc':
+                    savedStories.sort((a, b) => new Date(b.dateSaved) - new Date(a.dateSaved));
+                    break;
+                case 'date-asc':
+                    savedStories.sort((a, b) => new Date(a.dateSaved) - new Date(b.dateSaved));
+                    break;
+                case 'score-desc':
+                    savedStories.sort((a, b) => b.score - a.score);
+                    break;
+                case 'subreddit-az':
+                    savedStories.sort((a, b) => a.subreddit.localeCompare(b.subreddit));
+                    break;
+            }
+
+            allFetchedPosts = savedStories;
             storiesHeading.textContent = `You have ${allFetchedPosts.length} saved stor${allFetchedPosts.length === 1 ? 'y' : 'ies'}`;
+            
             if (allFetchedPosts.length > 0) {
                 clearSavedContainer.style.display = 'block';
                 displayStories(allFetchedPosts);
             } else {
                 clearSavedContainer.style.display = 'none';
-                storyContainer.innerHTML = `<p>You haven't saved any stories yet.</p>`;
+                storyContainer.innerHTML = `<p class="empty-state">You haven't saved any stories yet.</p>`;
             }
         }
 
