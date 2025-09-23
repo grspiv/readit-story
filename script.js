@@ -114,13 +114,11 @@ document.addEventListener('DOMContentLoaded', () => {
         // Narration State
         let audioContext;
         let audioBufferQueue = [];
-        let textChunkQueue = [];
         let nextScheduleTime = 0;
         let isNarrationPlaying = false;
         let isNarrationPaused = false;
         let activeSourceNodes = [];
         let narrationAudioCache = {}; // Cache for generated audio buffers
-        const MAX_BUFFER_AHEAD = 2; // How many chunks to pre-fetch
 
 
         // --- Initialization ---
@@ -191,13 +189,19 @@ document.addEventListener('DOMContentLoaded', () => {
         savedStoryNotes.addEventListener('input', debounce(saveStoryNote, 500));
         markAllReadButton.addEventListener('click', handleMarkAllRead);
         addTagInput.addEventListener('keydown', handleAddTag);
-        storyContainer.addEventListener('mouseover', handleQuickLook);
-        storyContainer.addEventListener('mouseout', hideQuickLook);
-        storyContainer.addEventListener('mousemove', (e) => {
-            if (quickLookPopup.classList.contains('visible')) {
-                positionQuickLook(e);
-            }
-        });
+
+        // Conditionally add hover listeners for desktop only
+        const isDesktop = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+        if (isDesktop) {
+            storyContainer.addEventListener('mouseover', handleQuickLook);
+            storyContainer.addEventListener('mouseout', hideQuickLook);
+            storyContainer.addEventListener('mousemove', (e) => {
+                if (quickLookPopup.classList.contains('visible')) {
+                    positionQuickLook(e);
+                }
+            });
+        }
+        
         closeApiKeyPopup.addEventListener('click', () => hideApiKeyModal(true)); // Pass true to indicate rejection
         saveApiKeyButton.addEventListener('click', handleSaveApiKey);
 
@@ -388,27 +392,18 @@ document.addEventListener('DOMContentLoaded', () => {
             timeRangeControls.style.display = isTop || (isSearch && sortSelect.value === 'top') ? 'flex' : 'none';
         }
 
-        function stopNarration(shouldCache = false) {
+        function stopNarration() {
             const narrateButton = document.getElementById('narrate-button');
             const stopButton = document.getElementById('stop-narration-button');
         
             isNarrationPlaying = false;
             isNarrationPaused = false;
         
-            if (shouldCache) {
-                // Save remaining text chunks and generated audio buffers
-                narrationAudioCache[currentStoryId] = {
-                    textQueue: textChunkQueue,
-                    bufferQueue: audioBufferQueue
-                };
-            }
-        
             activeSourceNodes.forEach(source => {
                 try { source.stop(); } catch(e) {}
             });
             activeSourceNodes = [];
             audioBufferQueue = [];
-            textChunkQueue = [];
         
             if (audioContext && audioContext.state !== 'closed') {
                 audioContext.close();
@@ -426,7 +421,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         function closePopup() {
             saveReadingPosition(); // Save position on close
-            stopNarration(false); // Stop narration and don't cache
+            stopNarration(); 
             if (liveCommentsInterval) {
                 clearInterval(liveCommentsInterval);
                 liveCommentsInterval = null;
@@ -437,11 +432,13 @@ document.addEventListener('DOMContentLoaded', () => {
             if (video) video.pause();
             galleryPrevButton.style.display = 'none';
             galleryNextButton.style.display = 'none';
+            
+            // Clear all story-specific caches
             currentStoryId = null;
             originalStoryContent = null;
             currentStorySummary = null;
             currentStoryTranslations = {};
-            narrationAudioCache = {}; // Clear cache on popup close
+            narrationAudioCache = {}; 
         }
 
         function handleScroll() {
@@ -570,13 +567,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         async function fetchAndShowComments(story) {
-            // Clear previous story's AI content
-            currentStorySummary = null;
-            currentStoryTranslations = {};
-            originalStoryContent = null;
-            narrationAudioCache = {}; // Clear narration cache for new story
+            closePopup(); // Close any existing popups and clear all caches.
 
-            // FIX: Clear the popup body before adding new content.
             popupBody.innerHTML = '';
 
             currentStoryId = story.id;
@@ -661,7 +653,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('live-comments-button').addEventListener('click', toggleLiveComments);
             document.getElementById('summarize-button').addEventListener('click', () => handleSummarize(story));
             document.getElementById('narrate-button').addEventListener('click', () => handleNarration(story));
-            document.getElementById('stop-narration-button').addEventListener('click', () => stopNarration(true));
+            document.getElementById('stop-narration-button').addEventListener('click', () => stopNarration());
             document.getElementById('translation-select').addEventListener('change', (e) => handleTranslation(story, e.target.value));
 
             
@@ -745,7 +737,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             finalContent += `<hr><div id="comment-section" data-op-author="${story.author}"></div>`;
             popupBody.innerHTML = finalContent;
-            
+
             await fetchCommentsForCurrentStory('confidence');
             restoreReadingPosition(story.id); // Restore position after content is loaded
             findSeries(story);
@@ -2145,6 +2137,29 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             return key;
         }
+        
+        async function fetchWithBackoff(url, options, maxRetries = 5) {
+            let lastError;
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    const response = await fetch(url, options);
+                    if (response.status === 429) {
+                        const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
+                        console.warn(`Rate limited. Retrying in ${delay}ms...`);
+                        lastError = new Error(`API rate limit exceeded`);
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        continue;
+                    }
+                    return response; // Success
+                } catch (e) {
+                    lastError = e;
+                    const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
+                    console.warn(`Fetch failed. Retrying in ${delay}ms...`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                }
+            }
+            throw new Error(`Failed to fetch after ${maxRetries} retries. Last error: ${lastError ? lastError.message : 'Unknown error'}`);
+        }
 
         async function callGeminiAPI(prompt) {
             try {
@@ -2155,7 +2170,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     contents: [{ parts: [{ text: prompt }] }],
                 };
                 
-                const response = await fetch(apiUrl, {
+                const response = await fetchWithBackoff(apiUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
@@ -2190,11 +2205,11 @@ document.addEventListener('DOMContentLoaded', () => {
             let fullText = "";
             try {
                 const apiKey = await getGeminiApiKey();
-                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:streamGenerateContent?key=${apiKey}`;
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:streamGenerateContent?key=${apiKey}&alt=sse`;
 
                 const payload = { contents: [{ parts: [{ text: prompt }] }] };
 
-                const response = await fetch(apiUrl, {
+                const response = await fetchWithBackoff(apiUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
@@ -2217,20 +2232,23 @@ document.addEventListener('DOMContentLoaded', () => {
                     const { value, done } = await reader.read();
                     if (done) break;
 
-                    const chunkText = decoder.decode(value);
-                    const parts = chunkText.split('data: ');
-                    
-                    for (const part of parts) {
-                        if (part.trim()) {
-                            try {
-                                const json = JSON.parse(part);
-                                const text = json.candidates?.[0]?.content?.parts?.[0]?.text || "";
-                                if (text) {
-                                    fullText += text;
-                                    onChunk(text);
+                    const chunkText = decoder.decode(value, { stream: true });
+                    const lines = chunkText.split('\n');
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const data = line.substring(6).trim();
+                            if (data) {
+                                try {
+                                    const json = JSON.parse(data);
+                                    const text = json.candidates?.[0]?.content?.parts?.[0]?.text || "";
+                                    if (text) {
+                                        fullText += text;
+                                        onChunk(text);
+                                    }
+                                } catch (e) {
+                                    console.log("Failed to parse stream data:", data);
                                 }
-                            } catch(e) {
-                                console.log("Failed to parse stream part:", part);
                             }
                         }
                     }
@@ -2397,7 +2415,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return chunks;
         }
 
-        async function fetchAndDecodeAudio(text) {
+        async function fetchAndDecodeAudio(text, audioCtx) {
             try {
                 const apiKey = await getGeminiApiKey();
                 const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
@@ -2407,13 +2425,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     model: "gemini-2.5-flash-preview-tts"
                 };
         
-                const response = await fetch(apiUrl, {
+                const response = await fetchWithBackoff(apiUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
         
-                if (!response.ok) throw new Error('Failed to generate audio chunk.');
+                if (!response.ok) {
+                    if (response.status === 429) throw new Error('API rate limit exceeded');
+                    throw new Error('Failed to generate audio chunk.');
+                }
         
                 const result = await response.json();
                 const part = result?.candidates?.[0]?.content?.parts?.[0];
@@ -2425,22 +2446,22 @@ document.addEventListener('DOMContentLoaded', () => {
                     const pcmData = base64ToArrayBuffer(audioData);
                     const pcm16 = new Int16Array(pcmData);
                     const wavBlob = pcmToWav(pcm16, sampleRate);
-                    return await audioContext.decodeAudioData(await wavBlob.arrayBuffer());
+                    return await audioCtx.decodeAudioData(await wavBlob.arrayBuffer());
                 } else {
                     throw new Error("No audio data in API response.");
                 }
             } catch (error) {
                 console.error("Audio fetch/decode error:", error);
                 showToast("Failed to process an audio segment.");
-                stopNarration(false); // Stop the whole process if one chunk fails
-                return null;
+                stopNarration();
+                throw error;
             }
         }
         
         function scheduleNextBuffer() {
             if (!isNarrationPlaying || isNarrationPaused || audioBufferQueue.length === 0) {
-                if (textChunkQueue.length === 0 && audioBufferQueue.length === 0) { // All chunks processed and played
-                    stopNarration(false);
+                if (isNarrationPlaying && audioBufferQueue.length === 0) {
+                    stopNarration();
                 }
                 return;
             }
@@ -2458,46 +2479,30 @@ document.addEventListener('DOMContentLoaded', () => {
         
             source.onended = () => {
                 activeSourceNodes = activeSourceNodes.filter(s => s !== source);
-                scheduleNextBuffer(); // Schedule the next one from the queue
+                scheduleNextBuffer();
             };
         
             nextScheduleTime += audioBuffer.duration;
-        
-            // Proactively fetch the next chunk if needed
-            if (textChunkQueue.length > 0 && (audioBufferQueue.length < MAX_BUFFER_AHEAD)) {
-                const nextTextChunk = textChunkQueue.shift();
-                fetchAndDecodeAudio(nextTextChunk).then(buffer => {
-                    if (buffer) {
-                        audioBufferQueue.push(buffer);
-                        // If playback hasn't started yet, this might kick it off
-                        if (activeSourceNodes.length === 0 && !isNarrationPaused) {
-                             scheduleNextBuffer();
-                        }
-                    }
-                });
-            }
         }
         
         async function handleNarration(story) {
             const narrateButton = document.getElementById('narrate-button');
             const stopButton = document.getElementById('stop-narration-button');
         
-            if (isNarrationPlaying && !isNarrationPaused) { // Is playing -> Pause
+            if (isNarrationPlaying && !isNarrationPaused) {
                 if (audioContext) audioContext.suspend();
                 isNarrationPaused = true;
                 narrateButton.textContent = 'Resume Narration';
                 return;
             }
         
-            if (isNarrationPlaying && isNarrationPaused) { // Is paused -> Resume
+            if (isNarrationPlaying && isNarrationPaused) {
                 if (audioContext) audioContext.resume();
                 isNarrationPaused = false;
                 narrateButton.textContent = 'Pause Narration';
-                scheduleNextBuffer(); // Kickstart scheduling again
                 return;
             }
         
-            // --- Is not playing -> Start new narration ---
             if (!story.selftext) {
                 showToast("This story has no text to narrate.");
                 return;
@@ -2512,32 +2517,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 isNarrationPlaying = true;
                 isNarrationPaused = false;
         
-                // Check cache first
-                if (narrationAudioCache[story.id] && narrationAudioCache[story.id].bufferQueue.length > 0) {
-                    audioBufferQueue = narrationAudioCache[story.id].bufferQueue;
-                    textChunkQueue = narrationAudioCache[story.id].textQueue;
+                if (narrationAudioCache[story.id]) {
+                    console.log("Using cached narration audio.");
+                    audioBufferQueue = [...narrationAudioCache[story.id]];
                 } else {
                     const textToNarrate = `Title: ${story.title}. By user ${story.author}. ${story.selftext}`;
-                    textChunkQueue = groupTextIntoChunks(textToNarrate, 1500);
+                    const chunks = groupTextIntoChunks(textToNarrate, 1500);
+                    if (chunks.length === 0) throw new Error("No text found to narrate.");
+
+                    const audioBufferPromises = chunks.map(chunk => fetchAndDecodeAudio(chunk, audioContext));
+                    const allBuffers = await Promise.all(audioBufferPromises);
+                    
+                    audioBufferQueue = allBuffers.filter(b => b); // Filter out any nulls from errors
+                    narrationAudioCache[story.id] = [...audioBufferQueue]; // Cache the successful buffers
                 }
-        
-                if (textChunkQueue.length === 0 && audioBufferQueue.length === 0) {
-                    showToast("No text found to narrate.");
-                    stopNarration(false);
-                    return;
-                }
-        
-                // Start pre-buffering
-                const initialFetchCount = Math.min(textChunkQueue.length, MAX_BUFFER_AHEAD);
-                const initialBufferPromises = [];
-                for (let i = 0; i < initialFetchCount; i++) {
-                    initialBufferPromises.push(fetchAndDecodeAudio(textChunkQueue.shift()));
-                }
-                
-                const initialBuffers = await Promise.all(initialBufferPromises);
-                initialBuffers.forEach(buffer => {
-                    if (buffer) audioBufferQueue.push(buffer);
-                });
         
                 if (audioBufferQueue.length > 0) {
                     narrateButton.disabled = false;
@@ -2545,14 +2538,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     stopButton.style.display = 'inline-block';
                     scheduleNextBuffer();
                 } else {
-                    showToast("Could not start narration.");
-                    stopNarration(false);
+                    throw new Error("Could not generate or find cached audio.");
                 }
         
             } catch (error) {
                 console.error("Narration failed to start:", error);
-                showToast("Could not initialize narration.");
-                stopNarration(false);
+                showToast(`Could not initialize narration: ${error.message}`);
+                stopNarration();
             }
         }
         
