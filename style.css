@@ -39,6 +39,10 @@ body.sepia {
     --shadow-color: rgba(88, 80, 64, 0.2);
 }
 
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
     background-color: var(--bg-color);
@@ -57,6 +61,7 @@ body {
     -webkit-tap-highlight-color: transparent; /* Disable tap highlight on iOS */
     -webkit-text-size-adjust: none; /* Prevent font scaling on orientation change */
     -webkit-font-smoothing: antialiased;
+    word-break: break-word;
 }
 
 @keyframes background-move {
@@ -87,7 +92,7 @@ body {
     font-size: clamp(1.8rem, 5vw, 2.5rem);
     letter-spacing: 2px;
     text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
-    flex-basis: 100%;
+    width: 100%;
     text-align: center;
 }
 
@@ -243,7 +248,6 @@ body {
     background-color: var(--card-bg);
     transition: all 0.3s ease;
     width: 100%;
-    box-sizing: border-box;
     -webkit-appearance: none;
     appearance: none;
 }
@@ -484,6 +488,7 @@ body {
     font-size: 1.3em;
     color: var(--heading-color);
     margin: 0 0 5px;
+    word-break: break-word; /* Prevent long titles from overflowing */
 }
 
 .story-card h3 a {
@@ -720,7 +725,6 @@ body {
     visibility: hidden;
     transition: opacity 0.4s ease, visibility 0.4s ease;
     padding: 10px;
-    box-sizing: border-box;
 }
 
 .popup-overlay.active {
@@ -773,6 +777,7 @@ body {
 
 .popup-title-container {
     flex-grow: 1;
+    min-width: 0;
 }
 
 .popup-title {
@@ -780,6 +785,7 @@ body {
     color: var(--heading-color);
     margin: 0;
     padding-right: 15px;
+    word-break: break-word;
 }
 
 .popup-subreddit-link {
@@ -796,6 +802,7 @@ body {
     display: flex;
     gap: 10px;
     margin-left: auto;
+    flex-shrink: 0;
 }
 
 .close-button {
@@ -853,17 +860,17 @@ body {
     flex-wrap: wrap;
     align-items: center;
 }
-.reading-controls, .comment-sort-controls, .translation-controls, .narration-controls {
+.reading-controls, .comment-sort-controls, .narration-controls, .translation-controls {
     display: flex;
     align-items: center;
     gap: 8px;
+    flex-wrap: wrap;
 }
 .reading-controls .icon-button {
     font-weight: bold;
 }
 .comment-sort-controls .dropdown-input,
-.translation-controls .dropdown-input,
-.narration-controls .dropdown-input {
+.translation-controls .dropdown-input {
     padding: 8px 12px;
     font-size: 14px;
     width: auto;
@@ -902,19 +909,6 @@ body {
     background-color: var(--border-color);
     margin: 25px 0;
 }
-
-.ai-output-box {
-    background-color: var(--bg-color);
-    padding: 15px;
-    border-radius: 12px;
-    margin: 20px 0;
-    border-left: 4px solid var(--accent-color);
-}
-.ai-output-box h4 {
-    margin: 0 0 10px 0;
-    color: var(--heading-color);
-}
-
 
 .comment-card {
     background-color: var(--bg-color);
@@ -1061,7 +1055,6 @@ body {
     text-align: center;
     width: 90%;
     max-width: 400px;
-    box-sizing: border-box;
 }
 
 #toast-notification.show {
@@ -1238,7 +1231,6 @@ input:checked + .slider:before { transform: translateX(26px); }
     font-family: inherit;
     font-size: 0.9em;
     resize: vertical;
-    box-sizing: border-box;
 }
 #saved-story-notes:focus, #add-tag-input:focus {
     outline: none;
@@ -1268,7 +1260,6 @@ input:checked + .slider:before { transform: translateX(26px); }
 
 #add-tag-input {
     width: 100%;
-    box-sizing: border-box;
     margin-top: 5px;
 }
 
@@ -1373,25 +1364,6 @@ input:checked + .slider:before { transform: translateX(26px); }
     color: #888;
 }
 
-/* API Key Modal */
-.api-key-note {
-    font-size: 0.85em;
-    color: #888;
-    background-color: var(--bg-color);
-    padding: 10px;
-    border-radius: 8px;
-    margin-top: 15px;
-}
-
-#api-key-body .input-group {
-    margin: 20px 0;
-}
-
-#api-key-body .action-button {
-    width: 100%;
-    box-sizing: border-box;
-}
-
 /* Quick Look Popup */
 #quick-look-popup {
     position: fixed;
@@ -1426,6 +1398,42 @@ input:checked + .slider:before { transform: translateX(26px); }
     overflow: hidden;
 }
 
+/* API Key Modal */
+.api-key-modal-content {
+    padding: 25px;
+}
+
+.api-key-modal-content h2 {
+    margin-top: 0;
+}
+
+.api-key-modal-content p {
+    margin-bottom: 15px;
+}
+
+.api-key-modal-content a {
+    color: var(--highlight-color);
+}
+
+.api-key-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+/* AI Output Box */
+.ai-output-box {
+    background-color: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 15px;
+    margin-top: 20px;
+}
+.ai-output-box h4 {
+    margin: 0 0 10px 0;
+    color: var(--heading-color);
+}
 
 
 @media (min-width: 1200px) {
@@ -1455,6 +1463,8 @@ input:checked + .slider:before { transform: translateX(26px); }
         flex-wrap: nowrap;
         align-items: center;
         gap: 10px;
+        overflow-x: auto; /* Allow horizontal scrolling if needed */
+        padding-bottom: 10px;
     }
     
     .controls .input-group label {
@@ -1462,8 +1472,8 @@ input:checked + .slider:before { transform: translateX(26px); }
     }
 
     .controls .input-group {
-        min-width: 0;
-        position: relative; /* Fix for input field interaction on mobile */
+        min-width: 150px; /* Allow shrinking */
+        flex-shrink: 1;
     }
 
     .controls .text-input {
@@ -1473,6 +1483,7 @@ input:checked + .slider:before { transform: translateX(26px); }
 
     .controls #fetch-button {
         flex-grow: 0;
+        flex-shrink: 0;
         padding: 10px 15px;
         min-width: auto;
     }
@@ -1535,9 +1546,22 @@ input:checked + .slider:before { transform: translateX(26px); }
     .popup-title {
         font-size: 1.3em;
     }
+
     .popup-controls {
         flex-direction: column;
-        align-items: flex-start;
+        align-items: stretch;
+        gap: 15px;
     }
+
+    .popup-actions-left, .popup-actions-right {
+        width: 100%;
+        justify-content: space-around;
+    }
+    
+    .narration-controls, .translation-controls, .reading-controls, .comment-sort-controls {
+        width: 100%;
+        justify-content: space-between;
+    }
+
 }
 
