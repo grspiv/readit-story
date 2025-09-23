@@ -117,7 +117,9 @@ document.addEventListener('DOMContentLoaded', () => {
         let textChunkQueue = [];
         let nextScheduleTime = 0;
         let isNarrationPlaying = false;
+        let isNarrationPaused = false;
         let activeSourceNodes = [];
+        let narrationAudioCache = {}; // Cache for generated audio buffers
         const MAX_BUFFER_AHEAD = 2; // How many chunks to pre-fetch
 
 
@@ -386,33 +388,45 @@ document.addEventListener('DOMContentLoaded', () => {
             timeRangeControls.style.display = isTop || (isSearch && sortSelect.value === 'top') ? 'flex' : 'none';
         }
 
-        function stopNarration() {
+        function stopNarration(shouldCache = false) {
             const narrateButton = document.getElementById('narrate-button');
-            const audioPlayer = document.getElementById('tts-audio-player');
-
+            const stopButton = document.getElementById('stop-narration-button');
+        
             isNarrationPlaying = false;
-            activeSourceNodes.forEach(source => source.stop());
+            isNarrationPaused = false;
+        
+            if (shouldCache) {
+                // Save remaining text chunks and generated audio buffers
+                narrationAudioCache[currentStoryId] = {
+                    textQueue: textChunkQueue,
+                    bufferQueue: audioBufferQueue
+                };
+            }
+        
+            activeSourceNodes.forEach(source => {
+                try { source.stop(); } catch(e) {}
+            });
             activeSourceNodes = [];
             audioBufferQueue = [];
             textChunkQueue = [];
-
+        
             if (audioContext && audioContext.state !== 'closed') {
                 audioContext.close();
                 audioContext = null;
             }
-
-            if (audioPlayer) {
-                 audioPlayer.style.display = 'none';
-            }
+        
             if (narrateButton) {
                 narrateButton.textContent = 'Narrate Story';
                 narrateButton.disabled = false;
+            }
+            if (stopButton) {
+                stopButton.style.display = 'none';
             }
         }
 
         function closePopup() {
             saveReadingPosition(); // Save position on close
-            stopNarration();
+            stopNarration(false); // Stop narration and don't cache
             if (liveCommentsInterval) {
                 clearInterval(liveCommentsInterval);
                 liveCommentsInterval = null;
@@ -427,6 +441,7 @@ document.addEventListener('DOMContentLoaded', () => {
             originalStoryContent = null;
             currentStorySummary = null;
             currentStoryTranslations = {};
+            narrationAudioCache = {}; // Clear cache on popup close
         }
 
         function handleScroll() {
@@ -559,6 +574,7 @@ document.addEventListener('DOMContentLoaded', () => {
             currentStorySummary = null;
             currentStoryTranslations = {};
             originalStoryContent = null;
+            narrationAudioCache = {}; // Clear narration cache for new story
 
             // FIX: Clear the popup body before adding new content.
             popupBody.innerHTML = '';
@@ -602,7 +618,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="popup-actions-right">
                     <div class="narration-controls">
                         <button id="narrate-button" class="action-button secondary">Narrate Story</button>
-                        <audio id="tts-audio-player" controls style="display:none;"></audio>
+                        <button id="stop-narration-button" class="action-button danger" style="display:none;">Stop</button>
                     </div>
                      <div class="translation-controls">
                         <label for="translation-select">Translate:</label>
@@ -645,6 +661,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('live-comments-button').addEventListener('click', toggleLiveComments);
             document.getElementById('summarize-button').addEventListener('click', () => handleSummarize(story));
             document.getElementById('narrate-button').addEventListener('click', () => handleNarration(story));
+            document.getElementById('stop-narration-button').addEventListener('click', () => stopNarration(true));
             document.getElementById('translation-select').addEventListener('change', (e) => handleTranslation(story, e.target.value));
 
             
@@ -2168,6 +2185,64 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw error; 
             }
         }
+        
+        async function streamGeminiAPI(prompt, onChunk) {
+            let fullText = "";
+            try {
+                const apiKey = await getGeminiApiKey();
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:streamGenerateContent?key=${apiKey}`;
+
+                const payload = { contents: [{ parts: [{ text: prompt }] }] };
+
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                     const errorBody = await response.json();
+                    console.error("Gemini API Error:", errorBody);
+                    if (response.status === 400 || response.status === 403) { 
+                        localStorage.removeItem('geminiApiKey'); 
+                        throw new Error(`API Error: Invalid API key. Please check your key and try again.`);
+                    }
+                    throw new Error(`API Error: ${errorBody.error.message}`);
+                }
+                
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+
+                    const chunkText = decoder.decode(value);
+                    const parts = chunkText.split('data: ');
+                    
+                    for (const part of parts) {
+                        if (part.trim()) {
+                            try {
+                                const json = JSON.parse(part);
+                                const text = json.candidates?.[0]?.content?.parts?.[0]?.text || "";
+                                if (text) {
+                                    fullText += text;
+                                    onChunk(text);
+                                }
+                            } catch(e) {
+                                console.log("Failed to parse stream part:", part);
+                            }
+                        }
+                    }
+                }
+                return fullText;
+
+            } catch (error) {
+                console.error("Error in streaming Gemini API call:", error);
+                showToast(error.message);
+                throw error;
+            }
+        }
 
         async function handleSummarize(story) {
             const summarizeButton = document.getElementById('summarize-button');
@@ -2195,14 +2270,30 @@ document.addEventListener('DOMContentLoaded', () => {
             summarizeButton.disabled = true;
             summarizeButton.textContent = 'Summarizing...';
             originalStoryContent = storyContentWrapper.innerHTML;
-            storyContentWrapper.innerHTML = '<div class="spinner"></div>';
+
+            const summaryContainer = document.createElement('div');
+            summaryContainer.className = 'ai-output-box';
+            summaryContainer.innerHTML = `
+                <h4>AI Summary</h4>
+                <div class="markdown-content" id="live-summary-content"></div>
+            `;
+            storyContentWrapper.innerHTML = '';
+            storyContentWrapper.appendChild(summaryContainer);
+
+            const liveSummaryContent = document.getElementById('live-summary-content');
+            let fullSummaryText = "";
 
             try {
                 const prompt = `Summarize the following story in a single, well-written paragraph. Be concise and capture the main points:\n\n---\n\n${story.selftext}`;
-                const summary = await callGeminiAPI(prompt);
-                currentStorySummary = `<div class="ai-output-box"><h4>AI Summary</h4><div class="markdown-content">${renderMarkdown(summary)}</div></div>`;
-                storyContentWrapper.innerHTML = currentStorySummary;
+                await streamGeminiAPI(prompt, (chunk) => {
+                    fullSummaryText += chunk;
+                    liveSummaryContent.innerHTML = renderMarkdown(fullSummaryText + '...');
+                });
+                
+                liveSummaryContent.innerHTML = renderMarkdown(fullSummaryText);
+                currentStorySummary = storyContentWrapper.innerHTML;
                 summarizeButton.textContent = 'Show Original';
+
             } catch (error) {
                 storyContentWrapper.innerHTML = originalStoryContent; // Restore original content on error
                 originalStoryContent = null;
@@ -2341,15 +2432,15 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch (error) {
                 console.error("Audio fetch/decode error:", error);
                 showToast("Failed to process an audio segment.");
-                stopNarration(); // Stop the whole process if one chunk fails
+                stopNarration(false); // Stop the whole process if one chunk fails
                 return null;
             }
         }
         
         function scheduleNextBuffer() {
-            if (!isNarrationPlaying || audioBufferQueue.length === 0) {
-                if (textChunkQueue.length === 0) { // All chunks processed and played
-                    stopNarration();
+            if (!isNarrationPlaying || isNarrationPaused || audioBufferQueue.length === 0) {
+                if (textChunkQueue.length === 0 && audioBufferQueue.length === 0) { // All chunks processed and played
+                    stopNarration(false);
                 }
                 return;
             }
@@ -2379,7 +2470,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (buffer) {
                         audioBufferQueue.push(buffer);
                         // If playback hasn't started yet, this might kick it off
-                        if (activeSourceNodes.length === 0) {
+                        if (activeSourceNodes.length === 0 && !isNarrationPaused) {
                              scheduleNextBuffer();
                         }
                     }
@@ -2389,34 +2480,50 @@ document.addEventListener('DOMContentLoaded', () => {
         
         async function handleNarration(story) {
             const narrateButton = document.getElementById('narrate-button');
-            const audioPlayer = document.getElementById('tts-audio-player');
+            const stopButton = document.getElementById('stop-narration-button');
         
-            if (isNarrationPlaying) {
-                stopNarration();
+            if (isNarrationPlaying && !isNarrationPaused) { // Is playing -> Pause
+                if (audioContext) audioContext.suspend();
+                isNarrationPaused = true;
+                narrateButton.textContent = 'Resume Narration';
                 return;
             }
         
+            if (isNarrationPlaying && isNarrationPaused) { // Is paused -> Resume
+                if (audioContext) audioContext.resume();
+                isNarrationPaused = false;
+                narrateButton.textContent = 'Pause Narration';
+                scheduleNextBuffer(); // Kickstart scheduling again
+                return;
+            }
+        
+            // --- Is not playing -> Start new narration ---
             if (!story.selftext) {
                 showToast("This story has no text to narrate.");
                 return;
             }
         
-            stopNarration(); // Reset everything before starting
             narrateButton.disabled = true;
             narrateButton.textContent = 'Generating...';
         
             try {
-                // Initialize Web Audio API
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 nextScheduleTime = audioContext.currentTime;
                 isNarrationPlaying = true;
+                isNarrationPaused = false;
         
-                const textToNarrate = `Title: ${story.title}. By user ${story.author}. ${story.selftext}`;
-                textChunkQueue = groupTextIntoChunks(textToNarrate, 1500);
+                // Check cache first
+                if (narrationAudioCache[story.id] && narrationAudioCache[story.id].bufferQueue.length > 0) {
+                    audioBufferQueue = narrationAudioCache[story.id].bufferQueue;
+                    textChunkQueue = narrationAudioCache[story.id].textQueue;
+                } else {
+                    const textToNarrate = `Title: ${story.title}. By user ${story.author}. ${story.selftext}`;
+                    textChunkQueue = groupTextIntoChunks(textToNarrate, 1500);
+                }
         
-                if (textChunkQueue.length === 0) {
+                if (textChunkQueue.length === 0 && audioBufferQueue.length === 0) {
                     showToast("No text found to narrate.");
-                    stopNarration();
+                    stopNarration(false);
                     return;
                 }
         
@@ -2434,19 +2541,18 @@ document.addEventListener('DOMContentLoaded', () => {
         
                 if (audioBufferQueue.length > 0) {
                     narrateButton.disabled = false;
-                    narrateButton.textContent = 'Stop Narration';
-                    audioPlayer.style.display = 'inline-block'; // Show player controls
-                    scheduleNextBuffer(); // Start the playback chain
+                    narrateButton.textContent = 'Pause Narration';
+                    stopButton.style.display = 'inline-block';
+                    scheduleNextBuffer();
                 } else {
-                    // This happens if all initial chunks failed to load
                     showToast("Could not start narration.");
-                    stopNarration();
+                    stopNarration(false);
                 }
         
             } catch (error) {
                 console.error("Narration failed to start:", error);
                 showToast("Could not initialize narration.");
-                stopNarration();
+                stopNarration(false);
             }
         }
         
