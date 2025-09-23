@@ -40,51 +40,58 @@
     </header>
     
     <main class="main-content">
-        <section class="controls">
-            <div class="input-group main-input">
-                <label for="subreddit-input">Subreddit:</label>
-                <input type="text" id="subreddit-input" list="subreddit-list" value="AskReddit" class="text-input">
-                <datalist id="subreddit-list"></datalist>
+        <section id="controls-container" class="controls-container">
+            <div class="controls">
+                <div class="input-group main-input">
+                    <label for="subreddit-input">Subreddit:</label>
+                    <input type="text" id="subreddit-input" list="subreddit-list" value="AskReddit" class="text-input">
+                    <datalist id="subreddit-list"></datalist>
+                </div>
+                <div class="input-group main-input search-container">
+                    <label for="search-input">Search within Subreddit:</label>
+                    <input type="text" id="search-input" class="text-input" placeholder="Enter keywords...">
+                    <button id="clear-search-button" class="clear-search-btn" style="display: none;">&times;</button>
+                </div>
+                <button id="fetch-button" class="action-button">Get Stories</button>
+                <button id="toggle-filters-button" class="action-button secondary icon-button" title="Toggle Filters">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46V19l4 2v-8.54L22 3z"></polygon></svg>
+                </button>
             </div>
-            <div class="input-group main-input search-container">
-                <label for="search-input">Search within Subreddit:</label>
-                <input type="text" id="search-input" class="text-input" placeholder="Enter keywords...">
-                <button id="clear-search-button" class="clear-search-btn" style="display: none;">&times;</button>
+            <div id="advanced-filters" class="advanced-filters">
+                <div class="input-group">
+                    <label for="sort-select">Sort by:</label>
+                    <select id="sort-select" class="dropdown-input">
+                        <option value="hot">Hot</option>
+                        <option value="new">New</option>
+                        <option value="top">Top</option>
+                        <option value="rising">Rising</option>
+                    </select>
+                </div>
+                 <div class="input-group" id="time-range-controls" style="display: none;">
+                    <label for="time-range-select">Time Range:</label>
+                    <select id="time-range-select" class="dropdown-input">
+                        <option value="all">All Time</option>
+                        <option value="year">Past Year</option>
+                        <option value="month">Past Month</option>
+                        <option value="week">Past Week</option>
+                        <option value="day">Past 24 Hours</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label for="flair-filter-input">Filter by Flair:</label>
+                    <input type="text" id="flair-filter-input" class="text-input" placeholder="e.g., 'Update', 'Series'">
+                </div>
+                <div class="input-group">
+                    <label for="min-score-input">Min Score:</label>
+                    <input type="number" id="min-score-input" class="text-input" placeholder="e.g., 1000">
+                </div>
+                <div class="input-group">
+                    <label for="min-comments-input">Min Comments:</label>
+                    <input type="number" id="min-comments-input" class="text-input" placeholder="e.g., 50">
+                </div>
+                <button id="random-button" class="action-button secondary">Random Subreddit</button>
+                <button id="surprise-button" class="action-button secondary surprise">Surprise Me!</button>
             </div>
-            <div class="input-group">
-                <label for="sort-select">Sort by:</label>
-                <select id="sort-select" class="dropdown-input">
-                    <option value="hot">Hot</option>
-                    <option value="new">New</option>
-                    <option value="top">Top</option>
-                    <option value="rising">Rising</option>
-                </select>
-            </div>
-             <div class="input-group" id="time-range-controls" style="display: none;">
-                <label for="time-range-select">Time Range:</label>
-                <select id="time-range-select" class="dropdown-input">
-                    <option value="all">All Time</option>
-                    <option value="year">Past Year</option>
-                    <option value="month">Past Month</option>
-                    <option value="week">Past Week</option>
-                    <option value="day">Past 24 Hours</option>
-                </select>
-            </div>
-            <div id="filter-section" class="input-group">
-                <label for="flair-filter-input">Filter by Flair:</label>
-                <input type="text" id="flair-filter-input" class="text-input" placeholder="e.g., 'Update', 'Series'">
-            </div>
-            <div class="input-group">
-                <label for="min-score-input">Min Score:</label>
-                <input type="number" id="min-score-input" class="text-input" placeholder="e.g., 1000">
-            </div>
-            <div class="input-group">
-                <label for="min-comments-input">Min Comments:</label>
-                <input type="number" id="min-comments-input" class="text-input" placeholder="e.g., 50">
-            </div>
-            <button id="fetch-button" class="action-button">Get Stories</button>
-            <button id="random-button" class="action-button secondary">Random Subreddit</button>
-            <button id="surprise-button" class="action-button secondary surprise">Surprise Me!</button>
         </section>
 
         <section class="action-bar">
@@ -137,26 +144,46 @@
             <span>Loading more stories...</span>
         </div>
     </main>
-
+    
+    <!-- Story Reader Popup -->
     <div id="popup-overlay" class="popup-overlay">
         <div class="popup-content">
+            <div id="reading-progress-bar" class="reading-progress-bar"></div>
             <div class="popup-header">
                 <div class="popup-title-container">
                     <h2 id="popup-title" class="popup-title"></h2>
                     <div id="popup-subreddit-link" class="popup-subreddit-link"></div>
                 </div>
                  <div class="popup-header-actions"></div>
-                <button id="close-popup" class="close-button">
+                <button id="close-popup" class="close-button" title="Close">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
                 </button>
             </div>
             <div class="popup-controls"></div>
+            <div id="series-navigation" class="series-navigation"></div>
             <div id="popup-body" class="popup-body"></div>
         </div>
         <button id="gallery-prev" class="gallery-nav prev" style="display: none;">&#10094;</button>
         <button id="gallery-next" class="gallery-nav next" style="display: none;">&#10095;</button>
+    </div>
+
+    <!-- User Profile Popup -->
+    <div id="user-profile-overlay" class="popup-overlay">
+         <div class="popup-content">
+             <div class="popup-header">
+                <div class="popup-title-container">
+                    <h2 id="user-profile-title" class="popup-title"></h2>
+                </div>
+                <button id="close-user-profile-popup" class="close-button" title="Close">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+            </div>
+            <div id="user-profile-body" class="popup-body"></div>
+         </div>
     </div>
     
     <button id="back-to-top" class="back-to-top" title="Go to top">
@@ -166,3 +193,4 @@
     <script src="script.js"></script>
 </body>
 </html>
+

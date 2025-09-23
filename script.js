@@ -21,7 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const viewSavedButton = document.getElementById('view-saved-button');
         const viewHistoryButton = document.getElementById('view-history-button');
         const storiesHeading = document.getElementById('stories-heading');
-        const controlsSection = document.querySelector('.controls');
+        const controlsContainer = document.getElementById('controls-container');
         const clearSavedButton = document.getElementById('clear-saved-button');
         const exportSavedButton = document.getElementById('export-saved-button');
         const importSavedButton = document.getElementById('import-saved-button');
@@ -30,7 +30,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const flairFilterInput = document.getElementById('flair-filter-input');
         const minScoreInput = document.getElementById('min-score-input');
         const minCommentsInput = document.getElementById('min-comments-input');
-        const filterSection = document.getElementById('filter-section');
         const savedSortSection = document.getElementById('saved-sort-section');
         const savedSortSelect = document.getElementById('saved-sort-select');
         const historySortSection = document.getElementById('history-sort-section');
@@ -48,10 +47,18 @@ document.addEventListener('DOMContentLoaded', () => {
         const clearSearchButton = document.getElementById('clear-search-button');
         const galleryPrevButton = document.getElementById('gallery-prev');
         const galleryNextButton = document.getElementById('gallery-next');
+        const readingProgressBar = document.getElementById('reading-progress-bar');
+        const seriesNavigation = document.getElementById('series-navigation');
+        const userProfileOverlay = document.getElementById('user-profile-overlay');
+        const userProfileTitle = document.getElementById('user-profile-title');
+        const userProfileBody = document.getElementById('user-profile-body');
+        const closeUserProfilePopup = document.getElementById('close-user-profile-popup');
+        const toggleFiltersButton = document.getElementById('toggle-filters-button');
+        const advancedFilters = document.getElementById('advanced-filters');
 
 
         // --- Constants & State ---
-        const REDDIT_API_BASE_URL = 'https://www.reddit.com/r/';
+        const REDDIT_API_BASE_URL = 'https://www.reddit.com/';
         const SAVED_STORIES_KEY = 'redditStorytellerSaved';
         const READ_HISTORY_KEY = 'redditStorytellerHistory';
         const SUBREDDIT_HISTORY_KEY = 'redditSubredditHistory';
@@ -59,7 +66,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const GALLERY_PREFERENCE_KEY = 'redditStorytellerGallery';
         const NSFW_PREFERENCE_KEY = 'redditStorytellerNSFW';
         const READING_SETTINGS_KEY = 'redditStorytellerReading';
-        const RANDOM_SUBREDDITS = ['nosleep', 'LetsNotMeet', 'glitch_in_the_matrix', 'tifu', 'confession', 'maliciouscompliance', 'talesfromtechsupport', 'WritingPrompts', 'shortscarystories', 'UnresolvedMysteries', 'ProRevenge', 'IDontWorkHereLady'];
+        const RANDOM_SUBREDDITS = ['nosleep', 'LetsNotMeet', 'glitch_in_the_matrix', 'tifu', 'confession', 'maliciouscompliance', 'talesfromtechsupport', 'WritingPrompts', 'shortscarystories', 'UnresolvedMysteries', 'ProRevenge', 'IDontWorkHereLady', 'talesfromretail', 'pettyrevenge', 'entitledparents'];
         
         let currentView = 'browsing'; // browsing, saved, history
         let currentAfterToken = null;
@@ -68,6 +75,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let isLoadingMore = false;
         let currentStoryId = null;
         let currentUtterance = null;
+        let currentSeries = { parts: [], currentIndex: -1 };
 
         // --- Initialization ---
         const savedTheme = localStorage.getItem('theme') || 'light';
@@ -116,10 +124,17 @@ document.addEventListener('DOMContentLoaded', () => {
         galleryNextButton.addEventListener('click', () => navigateGallery(1));
         closePopupButton.addEventListener('click', closePopup);
         popupOverlay.addEventListener('click', (e) => e.target === popupOverlay && closePopup());
+        closeUserProfilePopup.addEventListener('click', closeUserProfilePopupHandler);
+        userProfileOverlay.addEventListener('click', (e) => e.target === userProfileOverlay && closeUserProfilePopupHandler());
         window.addEventListener('scroll', handleScroll);
         backToTopButton.addEventListener('click', scrollToTop);
         document.addEventListener('keydown', handleKeyboardNav);
         popupBody.addEventListener('click', handlePopupBodyClick);
+        popupBody.addEventListener('scroll', handlePopupScroll);
+        toggleFiltersButton.addEventListener('click', () => {
+            advancedFilters.classList.toggle('open');
+            toggleFiltersButton.classList.toggle('active');
+        });
 
         // --- Main View Controller ---
         function switchToView(view, options = {}) {
@@ -132,11 +147,11 @@ document.addEventListener('DOMContentLoaded', () => {
             window.scrollTo({ top: 0, behavior: 'smooth' });
 
             // Hide all view-specific sections
-            [controlsSection, savedSortSection, clearSavedContainer, historySortSection, clearHistoryContainer, subredditInfoPanel].forEach(el => el.style.display = 'none');
+            [controlsContainer, savedSortSection, clearSavedContainer, historySortSection, clearHistoryContainer, subredditInfoPanel].forEach(el => el.style.display = 'none');
             [viewSavedButton, viewHistoryButton].forEach(btn => btn.classList.remove('active'));
 
             if (view === 'browsing') {
-                controlsSection.style.display = 'flex';
+                controlsContainer.style.display = 'block';
                 viewSavedButton.textContent = 'Saved Stories';
                 viewHistoryButton.textContent = 'History';
                 if (options.refresh) {
@@ -231,7 +246,7 @@ document.addEventListener('DOMContentLoaded', () => {
             surpriseButton.classList.add('pulse-active');
 
             const randomSub = RANDOM_SUBREDDITS[Math.floor(Math.random() * RANDOM_SUBREDDITS.length)];
-            const url = `${REDDIT_API_BASE_URL}${randomSub}/top.json?t=year&limit=50`;
+            const url = `${REDDIT_API_BASE_URL}r/${randomSub}/top.json?t=year&limit=50`;
 
             try {
                 const response = await fetch(url);
@@ -327,7 +342,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         async function fetchSubredditInfo(subreddit) {
             try {
-                const response = await fetch(`${REDDIT_API_BASE_URL}${subreddit}/about.json`);
+                const response = await fetch(`${REDDIT_API_BASE_URL}r/${subreddit}/about.json`);
                 if (!response.ok) throw new Error('Could not fetch subreddit info.');
                 const data = await response.json();
                 const info = data.data;
@@ -374,9 +389,9 @@ document.addEventListener('DOMContentLoaded', () => {
             
             let redditUrl;
             if (query) {
-                redditUrl = `${REDDIT_API_BASE_URL}${subreddit}/search.json?q=${encodeURIComponent(query)}&sort=${sort}&t=${timeRange}&restrict_sr=on&limit=25`;
+                redditUrl = `${REDDIT_API_BASE_URL}r/${subreddit}/search.json?q=${encodeURIComponent(query)}&sort=${sort}&t=${timeRange}&restrict_sr=on&limit=25`;
             } else {
-                redditUrl = `${REDDIT_API_BASE_URL}${subreddit}/${sort}.json?limit=25&t=${timeRange}`;
+                redditUrl = `${REDDIT_API_BASE_URL}r/${subreddit}/${sort}.json?limit=25&t=${timeRange}`;
             }
 
             if (loadMore && currentAfterToken) {
@@ -420,7 +435,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 subredditInput.value = story.subreddit;
                 switchToView('browsing', { refresh: true });
             });
-
 
             popupTitle.textContent = story.title;
             const header = popupTitle.parentElement.parentElement;
@@ -495,6 +509,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             document.body.style.overflow = 'hidden';
             popupOverlay.classList.add('active');
+            popupBody.scrollTop = 0; // Reset scroll position
+            handlePopupScroll(); // Update progress bar
             
             if (storyContainer.classList.contains('gallery-view')) {
                 galleryPrevButton.style.display = 'block';
@@ -520,6 +536,7 @@ document.addEventListener('DOMContentLoaded', () => {
             popupBody.innerHTML = finalContent;
             
             fetchCommentsForCurrentStory('confidence');
+            findSeries(story);
         }
 
         async function fetchCommentsForCurrentStory(sort) {
@@ -534,7 +551,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             try {
-                const commentsUrl = `${REDDIT_API_BASE_URL}${story.subreddit}/comments/${story.id}.json?sort=${sort}`;
+                const commentsUrl = `${REDDIT_API_BASE_URL}r/${story.subreddit}/comments/${story.id}.json?sort=${sort}`;
                 const response = await fetch(commentsUrl);
                 if (!response.ok) {
                     let errorText = `HTTP error! status: ${response.status}`;
@@ -577,7 +594,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     return `
                     <div class="comment-card ${opClass}" data-comment-author="${c.author}">
-                        <p class="comment-author"><span class="collapse-comment">[–]</span>u/${c.author} ${opLabel}</p>
+                        <p class="comment-author"><span class="collapse-comment">[–]</span><a href="#" class="author-link">u/${c.author}</a> ${opLabel}</p>
                         <div class="comment-body markdown-content">${renderMarkdown(commentBody)}</div>
                     </div>`
                 }).join('');
@@ -718,7 +735,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             ${story.link_flair_text ? `<span class="story-flair">${story.link_flair_text}</span>` : ''}
                         </div>
                         <h3><a href="${redditLink}" target="_blank" rel="noopener noreferrer">${story.title}</a></h3>
-                        <p class="author" title="Find all posts by this author">by u/${story.author}</p>
+                        <p class="author" title="View u/${story.author}'s profile">by u/${story.author}</p>
                         ${readAtTimeHTML}
                         <p class="reading-time">${readingTime} (${(story.selftext || '').split(/\s+/).length} words)</p>
                         <p class="preview">${story.selftext ? story.selftext.substring(0, 150) + '...' : ''}</p>
@@ -752,7 +769,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if(authorEl) {
                     authorEl.addEventListener('click', (e) => {
                         e.stopPropagation();
-                        handleAuthorClick(story.author);
+                        fetchUserProfile(story.author);
                     });
                 }
                 
@@ -985,7 +1002,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const dataBlob = new Blob([dataStr], { type: "application/json" });
             const url = URL.createObjectURL(dataBlob);
             const link = document.createElement('a');
-            link.href = url;
             link.download = `reddit-storyteller-saved_${new Date().toISOString().split('T')[0]}.json`;
             document.body.appendChild(link);
             link.click();
@@ -1176,6 +1192,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         function handleKeyboardNav(e) {
             const isPopupActive = popupOverlay.classList.contains('active');
+            const isProfileActive = userProfileOverlay.classList.contains('active');
             const isTyping = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName);
 
             if (isTyping && !isPopupActive) return;
@@ -1189,9 +1206,10 @@ document.addEventListener('DOMContentLoaded', () => {
             switch (e.key) {
                 case 'Escape':
                     if (isPopupActive) closePopup();
+                    if (isProfileActive) closeUserProfilePopupHandler();
                     break;
                 case 'j':
-                    if (!isPopupActive) {
+                    if (!isPopupActive && !isProfileActive) {
                         e.preventDefault();
                         if (currentIndex < cards.length - 1) {
                             currentIndex++;
@@ -1200,7 +1218,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     break;
                 case 'k':
-                     if (!isPopupActive) {
+                     if (!isPopupActive && !isProfileActive) {
                         e.preventDefault();
                         if (currentIndex > 0) {
                             currentIndex--;
@@ -1210,7 +1228,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     break;
                 case 'o':
                 case 'Enter':
-                     if (!isPopupActive && activeCard) {
+                     if (!isPopupActive && !isProfileActive && activeCard) {
                         e.preventDefault();
                         activeCard.click();
                     }
@@ -1233,6 +1251,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 const isCollapsed = commentCard.classList.toggle('collapsed');
                 collapseButton.textContent = isCollapsed ? '[+]' : '[–]';
             }
+            const authorLink = e.target.closest('.author-link');
+            if(authorLink) {
+                e.preventDefault();
+                const author = authorLink.textContent.replace('u/', '');
+                fetchUserProfile(author);
+            }
         }
         
         function navigateGallery(direction) {
@@ -1251,9 +1275,170 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
+        function handlePopupScroll() {
+            const { scrollTop, scrollHeight, clientHeight } = popupBody;
+            if (scrollHeight <= clientHeight) {
+                readingProgressBar.style.width = '100%';
+                return;
+            }
+            const scrollPercent = (scrollTop / (scrollHeight - clientHeight)) * 100;
+            readingProgressBar.style.width = `${scrollPercent}%`;
+        }
+        
+        async function findSeries(story) {
+            seriesNavigation.innerHTML = '';
+            currentSeries = { parts: [], currentIndex: -1 };
+            
+            // Regex to find "Part X" or similar patterns.
+            const partRegex = /(?:part|chapter)\s*(\d+)/i;
+            const match = story.title.match(partRegex);
+            
+            if (!match) return; // Not part of a detectable series
+
+            const currentPart = parseInt(match[1], 10);
+            // Get the base title by removing the part indicator and any surrounding characters.
+            const baseTitle = story.title.replace(partRegex, '').replace(/[\[\]()|]/g, '').trim();
+
+            try {
+                const url = `${REDDIT_API_BASE_URL}user/${story.author}/submitted.json?sort=new&limit=100`;
+                const response = await fetch(url);
+                if (!response.ok) return;
+                const data = await response.json();
+                
+                const authorPosts = data.data.children.map(p => p.data);
+                const seriesPosts = authorPosts.filter(p => p.subreddit === story.subreddit && p.title.toLowerCase().includes(baseTitle.toLowerCase()));
+
+                seriesPosts.forEach(p => {
+                    const postMatch = p.title.match(partRegex);
+                    if (postMatch) {
+                        p.part = parseInt(postMatch[1], 10);
+                    }
+                });
+
+                currentSeries.parts = seriesPosts.sort((a,b) => a.part - b.part);
+                currentSeries.currentIndex = currentSeries.parts.findIndex(p => p.id === story.id);
+                
+                displaySeriesNav();
+
+            } catch (error) {
+                console.error("Failed to find series:", error);
+            }
+        }
+
+        function displaySeriesNav() {
+            seriesNavigation.innerHTML = '';
+            if (currentSeries.currentIndex === -1) return;
+
+            const prevButton = document.createElement('button');
+            prevButton.textContent = '← Previous Part';
+            prevButton.disabled = currentSeries.currentIndex === 0;
+            prevButton.onclick = () => {
+                const prevStory = currentSeries.parts[currentSeries.currentIndex - 1];
+                if (prevStory) {
+                    closePopup();
+                    fetchAndShowComments(prevStory);
+                }
+            };
+
+            const nextButton = document.createElement('button');
+            nextButton.textContent = 'Next Part →';
+            nextButton.disabled = currentSeries.currentIndex === currentSeries.parts.length - 1;
+            nextButton.onclick = () => {
+                const nextStory = currentSeries.parts[currentSeries.currentIndex + 1];
+                if (nextStory) {
+                    closePopup();
+                    fetchAndShowComments(nextStory);
+                }
+            };
+
+            seriesNavigation.appendChild(prevButton);
+            seriesNavigation.appendChild(nextButton);
+        }
+        
+        // --- User Profile Functions ---
+        async function fetchUserProfile(author) {
+            userProfileTitle.textContent = `u/${author}`;
+            userProfileBody.innerHTML = '<div class="spinner"></div>';
+            userProfileOverlay.classList.add('active');
+            document.body.style.overflow = 'hidden';
+
+            try {
+                const [aboutRes, submittedRes] = await Promise.all([
+                    fetch(`${REDDIT_API_BASE_URL}user/${author}/about.json`),
+                    fetch(`${REDDIT_API_BASE_URL}user/${author}/submitted.json?limit=10`)
+                ]);
+
+                if (!aboutRes.ok || !submittedRes.ok) {
+                    throw new Error('Could not fetch user data.');
+                }
+                const aboutData = (await aboutRes.json()).data;
+                const submittedData = (await submittedRes.json()).data;
+                
+                displayUserProfile(aboutData, submittedData.children.map(p => p.data));
+
+            } catch (error) {
+                console.error("Failed to fetch user profile:", error);
+                userProfileBody.innerHTML = `<p>Could not load profile for u/${author}.</p>`;
+            }
+        }
+
+        function displayUserProfile(about, posts) {
+            const cakeDay = new Date(about.created_utc * 1000).toLocaleDateString();
+            
+            const postsHTML = posts.map(post => `
+                <div class="user-profile-post" data-story-id="${post.id}">
+                    <p class="user-profile-post-title">${post.title}</p>
+                    <p class="user-profile-post-meta">
+                        <strong>r/${post.subreddit}</strong> • ${post.score} upvotes • ${post.num_comments} comments
+                    </p>
+                </div>
+            `).join('');
+
+            userProfileBody.innerHTML = `
+                <div class="user-profile-info">
+                    <img src="${about.icon_img?.split('?')[0] || 'https://placehold.co/80x80/e74c3c/fff?text=R'}" alt="${about.name}'s avatar" class="user-profile-avatar">
+                    <div class="user-profile-stats">
+                        <div class="user-profile-stat">
+                            <div class="user-profile-stat-value">${(about.total_karma || 0).toLocaleString()}</div>
+                            <div class="user-profile-stat-label">Total Karma</div>
+                        </div>
+                         <div class="user-profile-stat">
+                            <div class="user-profile-stat-value">${cakeDay}</div>
+                            <div class="user-profile-stat-label">Cake Day</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="user-profile-posts">
+                    <h3>Recent Posts</h3>
+                    ${postsHTML || '<p>No recent posts found.</p>'}
+                </div>
+            `;
+            
+            userProfileBody.querySelectorAll('.user-profile-post').forEach(el => {
+                el.addEventListener('click', () => {
+                    const story = posts.find(p => p.id === el.dataset.storyId);
+                    if (story) {
+                        closeUserProfilePopupHandler();
+                        if (!allFetchedPosts.some(p => p.id === story.id)) {
+                             allFetchedPosts.push(story);
+                        }
+                        fetchAndShowComments(story);
+                    }
+                });
+            });
+        }
+        
+        function closeUserProfilePopupHandler() {
+            userProfileOverlay.classList.remove('active');
+            if(!popupOverlay.classList.contains('active')) {
+                 document.body.style.overflow = 'auto';
+            }
+        }
+
 
     } catch (e) {
         console.error("An error occurred during page initialization:", e);
         document.body.innerHTML = "<h1>A critical error occurred. Please refresh the page.</h1>";
     }
 });
+
