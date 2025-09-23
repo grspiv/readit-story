@@ -14,7 +14,7 @@
         <div class="header-controls">
             <div class="theme-switcher">
                 <label for="theme-select">Theme:</label>
-                <select id="theme-select" class="dropdown-input">
+                <select id="theme-select" class="dropdown-input" aria-label="Select color theme">
                     <option value="light">Light</option>
                     <option value="dark">Dark</option>
                     <option value="sepia">Sepia</option>
@@ -23,16 +23,23 @@
             <div class="filter-switch">
                  <label for="nsfw-toggle">Blur NSFW:</label>
                 <label class="switch">
-                    <input type="checkbox" id="nsfw-toggle">
+                    <input type="checkbox" id="nsfw-toggle" aria-label="Toggle NSFW content blurring">
+                    <span class="slider round"></span>
+                </label>
+            </div>
+             <div class="filter-switch">
+                 <label for="collapse-comments-toggle">Collapse Comments:</label>
+                <label class="switch">
+                    <input type="checkbox" id="collapse-comments-toggle" aria-label="Toggle collapsing comments by default">
                     <span class="slider round"></span>
                 </label>
             </div>
             <div class="layout-controls">
-                <button id="layout-toggle-button" class="icon-button" title="Toggle List/Grid View">
+                <button id="layout-toggle-button" class="icon-button" title="Toggle List/Grid View" aria-label="Toggle list or grid view">
                     <svg id="layout-icon-grid" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
                     <svg id="layout-icon-list" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
                 </button>
-                 <button id="gallery-toggle-button" class="icon-button" title="Toggle Gallery View" style="display: none;">
+                 <button id="gallery-toggle-button" class="icon-button" title="Toggle Gallery View" style="display: none;" aria-label="Toggle gallery view">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
                 </button>
             </div>
@@ -44,23 +51,23 @@
             <div class="controls">
                 <div class="input-group main-input">
                     <label for="subreddit-input">Subreddit (use + for multi):</label>
-                    <input type="text" id="subreddit-input" list="subreddit-list" value="AskReddit" class="text-input">
+                    <input type="text" id="subreddit-input" list="subreddit-list" value="AskReddit" class="text-input" aria-label="Subreddit input">
                     <datalist id="subreddit-list"></datalist>
                 </div>
                 <div class="input-group main-input search-container">
                     <label for="search-input">Search within Subreddit:</label>
-                    <input type="text" id="search-input" class="text-input" placeholder="Enter keywords...">
-                    <button id="clear-search-button" class="clear-search-btn" style="display: none;">&times;</button>
+                    <input type="text" id="search-input" class="text-input" placeholder="Enter keywords..." aria-label="Search within subreddit">
+                    <button id="clear-search-button" class="clear-search-btn" style="display: none;" aria-label="Clear search input">&times;</button>
                 </div>
                 <button id="fetch-button" class="action-button">Get Stories</button>
-                <button id="toggle-filters-button" class="action-button secondary icon-button" title="Toggle Filters">
+                <button id="toggle-filters-button" class="action-button secondary icon-button" title="Toggle Filters" aria-label="Toggle advanced filters">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46V19l4 2v-8.54L22 3z"></polygon></svg>
                 </button>
             </div>
             <div id="advanced-filters" class="advanced-filters">
                 <div class="input-group">
                     <label for="sort-select">Sort by:</label>
-                    <select id="sort-select" class="dropdown-input">
+                    <select id="sort-select" class="dropdown-input" aria-label="Sort stories by">
                         <option value="hot">Hot</option>
                         <option value="new">New</option>
                         <option value="top">Top</option>
@@ -69,7 +76,7 @@
                 </div>
                  <div class="input-group" id="time-range-controls" style="display: none;">
                     <label for="time-range-select">Time Range:</label>
-                    <select id="time-range-select" class="dropdown-input">
+                    <select id="time-range-select" class="dropdown-input" aria-label="Select time range for top stories">
                         <option value="all">All Time</option>
                         <option value="year">Past Year</option>
                         <option value="month">Past Month</option>
@@ -79,15 +86,15 @@
                 </div>
                 <div class="input-group">
                     <label for="flair-filter-input">Filter by Flair:</label>
-                    <input type="text" id="flair-filter-input" class="text-input" placeholder="e.g., 'Update', 'Series'">
+                    <input type="text" id="flair-filter-input" class="text-input" placeholder="e.g., 'Update', 'Series'" aria-label="Filter stories by flair">
                 </div>
                 <div class="input-group">
                     <label for="min-score-input">Min Score:</label>
-                    <input type="number" id="min-score-input" class="text-input" placeholder="e.g., 1000">
+                    <input type="number" id="min-score-input" class="text-input" placeholder="e.g., 1000" aria-label="Filter stories by minimum score">
                 </div>
                 <div class="input-group">
                     <label for="min-comments-input">Min Comments:</label>
-                    <input type="number" id="min-comments-input" class="text-input" placeholder="e.g., 50">
+                    <input type="number" id="min-comments-input" class="text-input" placeholder="e.g., 50" aria-label="Filter stories by minimum comments">
                 </div>
                 <button id="random-button" class="action-button secondary">Random Subreddit</button>
                 <button id="surprise-button" class="action-button secondary surprise">Surprise Me!</button>
@@ -95,37 +102,38 @@
         </section>
 
         <section class="action-bar">
+            <button id="mark-all-read-button" class="action-button secondary" style="display: none;">Mark Visible as Read</button>
             <button id="view-saved-button" class="action-button secondary">Saved Stories</button>
             <button id="view-history-button" class="action-button secondary">History</button>
              <div id="saved-sort-section" class="input-group" style="display: none;">
                 <label for="saved-sort-select">Sort Saved by:</label>
-                <select id="saved-sort-select" class="dropdown-input">
+                <select id="saved-sort-select" class="dropdown-input" aria-label="Sort saved stories by">
                     <option value="date-desc">Date Saved (Newest)</option>
                     <option value="date-asc">Date Saved (Oldest)</option>
                     <option value="score-desc">Score</option>
                     <option value="subreddit-az">Subreddit (A-Z)</option>
                 </select>
                 <div class="input-group search-container">
-                    <input type="text" id="saved-search-input" class="text-input" placeholder="Search saved stories...">
+                    <input type="text" id="saved-search-input" class="text-input" placeholder="Search saved stories..." aria-label="Search within saved stories">
                 </div>
             </div>
              <div id="history-sort-section" class="input-group" style="display: none;">
                 <label for="history-sort-select">Sort History by:</label>
-                <select id="history-sort-select" class="dropdown-input">
+                <select id="history-sort-select" class="dropdown-input" aria-label="Sort history by">
                     <option value="date-desc">Date Read (Newest)</option>
                     <option value="date-asc">Date Read (Oldest)</option>
                     <option value="score-desc">Score</option>
                     <option value="subreddit-az">Subreddit (A-Z)</option>
                 </select>
                 <div class="input-group search-container">
-                    <input type="text" id="history-search-input" class="text-input" placeholder="Search history...">
+                    <input type="text" id="history-search-input" class="text-input" placeholder="Search history..." aria-label="Search within history">
                 </div>
             </div>
              <div id="clear-saved-container" style="display: none;">
                 <div>
                     <button id="export-saved-button" class="action-button secondary">Export</button>
                     <button id="import-saved-button" class="action-button secondary">Import</button>
-                    <input type="file" id="import-file-input" accept=".json" style="display: none;">
+                    <input type="file" id="import-file-input" accept=".json" style="display: none;" aria-label="Import saved stories file">
                 </div>
                 <button id="clear-saved-button" class="action-button danger">Clear All Saved</button>
             </div>
@@ -161,7 +169,7 @@
                     <div id="popup-subreddit-link" class="popup-subreddit-link"></div>
                 </div>
                  <div class="popup-header-actions"></div>
-                <button id="close-popup" class="close-button" title="Close">
+                <button id="close-popup" class="close-button" title="Close" aria-label="Close story viewer">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
@@ -169,11 +177,16 @@
             </div>
             <div id="jump-to-nav" class="jump-to-nav"></div>
             <div class="popup-controls"></div>
+            <div id="comment-navigator" class="comment-navigator" style="display: none;"></div>
             <div id="series-navigation" class="series-navigation"></div>
             <div id="popup-body" class="popup-body"></div>
+            <div id="saved-story-notes-container" class="saved-story-notes-container" style="display: none;">
+                <h4>My Notes</h4>
+                <textarea id="saved-story-notes" placeholder="Add personal notes for this story..." aria-label="My notes for this story"></textarea>
+            </div>
         </div>
-        <button id="gallery-prev" class="gallery-nav prev" style="display: none;">&#10094;</button>
-        <button id="gallery-next" class="gallery-nav next" style="display: none;">&#10095;</button>
+        <button id="gallery-prev" class="gallery-nav prev" style="display: none;" aria-label="Previous image">&#10094;</button>
+        <button id="gallery-next" class="gallery-nav next" style="display: none;" aria-label="Next image">&#10095;</button>
     </div>
 
     <!-- User Profile Popup -->
@@ -183,7 +196,7 @@
                 <div class="popup-title-container">
                     <h2 id="user-profile-title" class="popup-title"></h2>
                 </div>
-                <button id="close-user-profile-popup" class="close-button" title="Close">
+                <button id="close-user-profile-popup" class="close-button" title="Close" aria-label="Close user profile">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
@@ -193,10 +206,10 @@
          </div>
     </div>
     
-    <button id="back-to-top" class="back-to-top" title="Go to top">
+    <button id="back-to-top" class="back-to-top" title="Go to top" aria-label="Back to top">
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
     </button>
-    <div id="toast-notification"></div>
+    <div id="toast-notification" role="alert" aria-live="assertive"></div>
     <script src="script.js"></script>
 </body>
 </html>

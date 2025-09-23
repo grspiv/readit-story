@@ -58,6 +58,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const savedSearchInput = document.getElementById('saved-search-input');
         const historySearchInput = document.getElementById('history-search-input');
         const jumpToNav = document.getElementById('jump-to-nav');
+        const collapseCommentsToggle = document.getElementById('collapse-comments-toggle');
+        const savedStoryNotesContainer = document.getElementById('saved-story-notes-container');
+        const savedStoryNotes = document.getElementById('saved-story-notes');
 
 
         // --- Constants & State ---
@@ -69,6 +72,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const GALLERY_PREFERENCE_KEY = 'redditStorytellerGallery';
         const NSFW_PREFERENCE_KEY = 'redditStorytellerNSFW';
         const READING_SETTINGS_KEY = 'redditStorytellerReading';
+        const COLLAPSE_COMMENTS_KEY = 'redditStorytellerCollapseComments';
+        const STORY_NOTES_KEY = 'redditStorytellerNotes';
         const RANDOM_SUBREDDITS = ['nosleep', 'LetsNotMeet', 'glitch_in_the_matrix', 'tifu', 'confession', 'maliciouscompliance', 'talesfromtechsupport', 'WritingPrompts', 'shortscarystories', 'UnresolvedMysteries', 'ProRevenge', 'IDontWorkHereLady', 'talesfromretail', 'pettyrevenge', 'entitledparents'];
         
         let currentView = 'browsing'; // browsing, saved, history
@@ -84,12 +89,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const savedTheme = localStorage.getItem('theme') || 'light';
         const savedLayout = localStorage.getItem(LAYOUT_PREFERENCE_KEY) || 'grid';
         const savedNSFWPreference = localStorage.getItem(NSFW_PREFERENCE_KEY) === 'true';
+        const savedCollapseComments = localStorage.getItem(COLLAPSE_COMMENTS_KEY) === 'true';
         
         applyTheme(savedTheme);
         applyLayout(savedLayout);
         applyNSFWPreference(savedNSFWPreference);
         applyReadingSettings();
         populateSubredditHistory();
+        applyCollapseCommentsPreference(savedCollapseComments);
         
         const initialSubreddit = RANDOM_SUBREDDITS[Math.floor(Math.random() * RANDOM_SUBREDDITS.length)];
         subredditInput.value = initialSubreddit;
@@ -140,6 +147,8 @@ document.addEventListener('DOMContentLoaded', () => {
             advancedFilters.classList.toggle('open');
             toggleFiltersButton.classList.toggle('active');
         });
+        collapseCommentsToggle.addEventListener('change', () => applyCollapseCommentsPreference(collapseCommentsToggle.checked, true));
+        savedStoryNotes.addEventListener('input', debounce(saveStoryNote, 500));
 
         // --- Main View Controller ---
         function switchToView(view, options = {}) {
@@ -226,6 +235,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 renderFilteredStories();
             }
         }
+
+        function applyCollapseCommentsPreference(shouldCollapse, shouldRender = false) {
+            collapseCommentsToggle.checked = shouldCollapse;
+            localStorage.setItem(COLLAPSE_COMMENTS_KEY, shouldCollapse);
+            if (shouldRender && popupOverlay.classList.contains('active')) {
+                // If a story is open, re-render its comments with the new setting
+                const commentsContainer = document.getElementById('comment-section');
+                if (commentsContainer) {
+                    commentsContainer.querySelectorAll('.comment-card').forEach(card => {
+                        const collapseButton = card.querySelector('.collapse-comment');
+                        if (shouldCollapse) {
+                            card.classList.add('collapsed');
+                            if(collapseButton) collapseButton.textContent = '[+]';
+                        } else {
+                            card.classList.remove('collapsed');
+                            if(collapseButton) collapseButton.textContent = '[–]';
+                        }
+                    });
+                }
+            }
+        }
         
         function handleLayoutToggle() {
             const isListView = storyContainer.classList.contains('list-view');
@@ -242,6 +272,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const randomSub = RANDOM_SUBREDDITS[Math.floor(Math.random() * RANDOM_SUBREDDITS.length)];
             subredditInput.value = randomSub;
             searchInput.value = '';
+            if (toggleFiltersButton.offsetParent !== null) { // Check if filters button is visible (mobile)
+                advancedFilters.classList.remove('open');
+                toggleFiltersButton.classList.remove('active');
+            }
             switchToView('browsing', { refresh: true });
         }
 
@@ -249,6 +283,10 @@ document.addEventListener('DOMContentLoaded', () => {
             showToast('Finding a great story for you...');
             surpriseButton.disabled = true;
             surpriseButton.classList.add('pulse-active');
+            if (toggleFiltersButton.offsetParent !== null) { // Check if filters button is visible (mobile)
+                advancedFilters.classList.remove('open');
+                toggleFiltersButton.classList.remove('active');
+            }
 
             const randomSub = RANDOM_SUBREDDITS[Math.floor(Math.random() * RANDOM_SUBREDDITS.length)];
             const url = `${REDDIT_API_BASE_URL}r/${randomSub}/top.json?t=year&limit=50`;
@@ -469,17 +507,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="popup-actions-right">
                      <div class="reading-controls">
                         <span>Font Size:</span>
-                        <button id="font-size-down" class="icon-button" title="Decrease Font Size">A-</button>
-                        <button id="font-size-up" class="icon-button" title="Increase Font Size">A+</button>
+                        <button id="font-size-down" class="icon-button" title="Decrease Font Size" aria-label="Decrease font size">A-</button>
+                        <button id="font-size-up" class="icon-button" title="Increase Font Size" aria-label="Increase font size">A+</button>
                     </div>
                     <div class="reading-controls">
                         <span>Line Height:</span>
-                        <button id="line-height-down" class="icon-button" title="Decrease Line Height"> Less</button>
-                        <button id="line-height-up" class="icon-button" title="Increase Line Height">More</button>
+                        <button id="line-height-down" class="icon-button" title="Decrease Line Height" aria-label="Decrease line height"> Less</button>
+                        <button id="line-height-up" class="icon-button" title="Increase Line Height" aria-label="Increase line height">More</button>
                     </div>
                      <div class="comment-sort-controls">
                         <label for="comment-sort-select">Sort Comments:</label>
-                        <select id="comment-sort-select" class="dropdown-input">
+                        <select id="comment-sort-select" class="dropdown-input" aria-label="Sort comments by">
                             <option value="confidence">Top</option>
                             <option value="new">New</option>
                             <option value="controversial">Controversial</option>
@@ -507,6 +545,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const shareBtn = document.createElement('button');
             shareBtn.className = 'icon-button';
             shareBtn.title = 'Copy Link';
+            shareBtn.setAttribute('aria-label', 'Copy link to story');
             shareBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>`;
             shareBtn.onclick = () => {
                 navigator.clipboard.writeText(redditLink);
@@ -520,15 +559,25 @@ document.addEventListener('DOMContentLoaded', () => {
             linkEl.rel = 'noopener noreferrer';
             linkEl.className = 'icon-button';
             linkEl.title = 'View on Reddit';
+            linkEl.setAttribute('aria-label', 'View story on Reddit');
             linkEl.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>`;
             headerActions.appendChild(linkEl);
 
             const downloadBtn = document.createElement('button');
             downloadBtn.className = 'icon-button';
             downloadBtn.title = 'Download Story';
+            downloadBtn.setAttribute('aria-label', 'Download story as text file');
             downloadBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>`;
             downloadBtn.onclick = () => downloadStory(story);
             headerActions.appendChild(downloadBtn);
+
+            // Handle notes section for saved stories
+            if (isStorySaved(story.id)) {
+                savedStoryNotesContainer.style.display = 'block';
+                savedStoryNotes.value = getStoryNote(story.id);
+            } else {
+                savedStoryNotesContainer.style.display = 'none';
+            }
 
             document.body.style.overflow = 'hidden';
             popupOverlay.classList.add('active');
@@ -541,8 +590,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             let storyText = story.selftext || '';
-            if (currentSearchQuery) {
-                storyText = highlightKeywords(storyText, currentSearchQuery);
+            let searchQueryForHighlight = currentView === 'browsing' ? currentSearchQuery : (currentView === 'saved' ? savedSearchInput.value : historySearchInput.value);
+            if (searchQueryForHighlight) {
+                storyText = highlightKeywords(storyText, searchQueryForHighlight);
             }
 
             let finalContent = `<div id="story-content-wrapper">`;
@@ -603,6 +653,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const commentSection = document.getElementById('comment-section');
             if (!commentSection) return;
             const opAuthor = commentSection.dataset.opAuthor;
+            const shouldCollapse = collapseCommentsToggle.checked;
+            let searchQueryForHighlight = currentView === 'browsing' ? currentSearchQuery : (currentView === 'saved' ? savedSearchInput.value : historySearchInput.value);
 
             const moreCommentsObject = commentData.find(c => c.kind === 'more');
             const actualComments = commentData.filter(c => c.kind === 't1');
@@ -610,16 +662,18 @@ document.addEventListener('DOMContentLoaded', () => {
             if (actualComments.length > 0) {
                  const commentsHTML = actualComments.map(c => c.data).filter(c => c.body).map(c => {
                     let commentBody = c.body;
-                    if (currentSearchQuery) {
-                       commentBody = highlightKeywords(commentBody, currentSearchQuery);
+                    if (searchQueryForHighlight) {
+                       commentBody = highlightKeywords(commentBody, searchQueryForHighlight);
                     }
                     const isOp = c.author === opAuthor;
                     const opClass = isOp ? 'op-comment' : '';
                     const opLabel = isOp ? '<span class="op-label">OP</span>' : '';
+                    const collapsedClass = shouldCollapse ? 'collapsed' : '';
+                    const collapseSymbol = shouldCollapse ? '[+]' : '[–]';
 
                     return `
-                    <div class="comment-card ${opClass}" data-comment-author="${c.author}">
-                        <p class="comment-author"><span class="collapse-comment">[–]</span><a href="#" class="author-link">u/${c.author}</a> ${opLabel}</p>
+                    <div class="comment-card ${opClass} ${collapsedClass}" data-comment-author="${c.author}">
+                        <p class="comment-author"><span class="collapse-comment">${collapseSymbol}</span><a href="#" class="author-link">u/${c.author}</a> ${opLabel}</p>
                         <div class="comment-body markdown-content">${renderMarkdown(commentBody)}</div>
                     </div>`
                 }).join('');
@@ -873,6 +927,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         function highlightKeywords(text, query) {
+            if (!query) return text;
             const keywords = query.split(' ').filter(Boolean);
             const regex = new RegExp(`(${keywords.join('|')})`, 'gi');
             return text.replace(regex, `<span class="highlight">$1</span>`);
@@ -967,6 +1022,7 @@ document.addEventListener('DOMContentLoaded', () => {
          function handleClearSaved() {
             if (confirm("Are you sure you want to delete all saved stories? This cannot be undone.")) {
                 localStorage.removeItem(SAVED_STORIES_KEY);
+                localStorage.removeItem(STORY_NOTES_KEY);
                 displaySavedStories();
             }
         }
@@ -980,11 +1036,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 savedStories.splice(storyIndex, 1);
                 button.textContent = 'Save';
                 button.classList.remove('saved');
+                if (popupOverlay.classList.contains('active') && currentStoryId === story.id) {
+                    savedStoryNotesContainer.style.display = 'none';
+                }
             } else {
                 const storyToSave = { ...story, dateSaved: new Date().toISOString() };
                 savedStories.push(storyToSave);
                 button.textContent = 'Saved';
                 button.classList.add('saved');
+                 if (popupOverlay.classList.contains('active') && currentStoryId === story.id) {
+                    savedStoryNotesContainer.style.display = 'block';
+                    savedStoryNotes.value = getStoryNote(story.id);
+                }
             }
             localStorage.setItem(SAVED_STORIES_KEY, JSON.stringify(savedStories));
             if (currentView === 'saved') displaySavedStories();
@@ -1049,7 +1112,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 showToast("No saved stories to export.");
                 return;
             }
-            const dataStr = JSON.stringify(savedStories, null, 2);
+            const notes = getStoryNotes();
+            const exportData = {
+                stories: savedStories,
+                notes: notes,
+            };
+            const dataStr = JSON.stringify(exportData, null, 2);
             const dataBlob = new Blob([dataStr], { type: "application/json" });
             const url = URL.createObjectURL(dataBlob);
             const link = document.createElement('a');
@@ -1068,8 +1136,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const reader = new FileReader();
             reader.onload = (e) => {
                 try {
-                    const importedStories = JSON.parse(e.target.result);
-                    if (!Array.isArray(importedStories)) throw new Error("Invalid format.");
+                    const importedData = JSON.parse(e.target.result);
+                    // Handle both new and old export formats
+                    const importedStories = Array.isArray(importedData) ? importedData : importedData.stories;
+                    const importedNotes = importedData.notes || {};
+
+                    if (!Array.isArray(importedStories)) throw new Error("Invalid stories format.");
 
                     const existingStories = getSavedStories();
                     const existingIds = new Set(existingStories.map(s => s.id));
@@ -1082,7 +1154,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     });
 
+                    const existingNotes = getStoryNotes();
+                    const finalNotes = { ...existingNotes, ...importedNotes };
+
                     localStorage.setItem(SAVED_STORIES_KEY, JSON.stringify(existingStories));
+                    localStorage.setItem(STORY_NOTES_KEY, JSON.stringify(finalNotes));
+
                     showToast(`Successfully imported ${newStoriesCount} new stories!`);
                     if (currentView === 'saved') displaySavedStories();
 
@@ -1131,6 +1208,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     const body = card.querySelector('.comment-body').innerText;
                     return `Comment by u/${author}:\n${body}\n\n--------------------\n\n`;
                 }).join('');
+                
+                const notes = getStoryNote(story.id);
+                const notesSection = notes ? `====================\r\nMY NOTES\r\n====================\r\n\r\n${notes}\r\n\r\n` : '';
 
                 const storyContent = `Title: ${story.title}\r\n` +
                                      `Author: u/${story.author}\r\n` +
@@ -1140,6 +1220,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                      `Comments: ${story.num_comments}\r\n\r\n` +
                                      `====================\r\n\r\n` +
                                      `${story.selftext}\r\n\r\n` +
+                                     `${notesSection}` +
                                      `====================\r\nCOMMENTS\r\n====================\r\n\r\n` +
                                      `${comments}`;
 
@@ -1246,7 +1327,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const isProfileActive = userProfileOverlay.classList.contains('active');
             const isTyping = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName);
 
-            if (isTyping && !isPopupActive) return;
+            if (isTyping) return;
 
             let cards = [...storyContainer.querySelectorAll('.story-card')];
             cards = cards.filter(card => card.style.display !== 'none');
@@ -1484,6 +1565,32 @@ document.addEventListener('DOMContentLoaded', () => {
             if(!popupOverlay.classList.contains('active')) {
                  document.body.style.overflow = 'auto';
             }
+        }
+        
+        // --- Story Notes Functions ---
+        function getStoryNotes() {
+            return JSON.parse(localStorage.getItem(STORY_NOTES_KEY)) || {};
+        }
+
+        function getStoryNote(storyId) {
+            const notes = getStoryNotes();
+            return notes[storyId] || '';
+        }
+
+        function saveStoryNote() {
+            const notes = getStoryNotes();
+            notes[currentStoryId] = savedStoryNotes.value;
+            localStorage.setItem(STORY_NOTES_KEY, JSON.stringify(notes));
+        }
+
+        // --- Utility Functions ---
+        function debounce(func, delay) {
+            let timeout;
+            return function(...args) {
+                const context = this;
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(context, args), delay);
+            };
         }
 
 
