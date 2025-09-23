@@ -60,7 +60,6 @@ document.addEventListener('DOMContentLoaded', () => {
         applyNSFWPreference(savedNSFWPreference);
         populateSubredditHistory();
         
-        // Load a random subreddit on first page load
         const initialSubreddit = RANDOM_SUBREDDITS[Math.floor(Math.random() * RANDOM_SUBREDDITS.length)];
         subredditInput.value = initialSubreddit;
         fetchStories(initialSubreddit, 'hot', 'all', false);
@@ -101,21 +100,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 storyContainer.classList.add('list-view');
                 layoutIconGrid.style.display = 'none';
                 layoutIconList.style.display = 'block';
-            } else if (layout === 'gallery') {
-                storyContainer.classList.add('gallery-view');
-            } else { // Grid
+            } else { // Grid is default
+                storyContainer.classList.remove('list-view');
                 layoutIconGrid.style.display = 'block';
                 layoutIconList.style.display = 'none';
             }
-            
-            // Highlight active layout button
-            layoutToggleButton.classList.toggle('active', layout === 'grid' || layout === 'list');
-            galleryToggleButton.classList.toggle('active', layout === 'gallery');
+             localStorage.setItem(LAYOUT_PREFERENCE_KEY, layout);
+        }
 
-            if (layout !== 'gallery') { // Don't save gallery mode as the main layout
-                localStorage.setItem(LAYOUT_PREFERENCE_KEY, layout);
+        function applyGalleryPreference(isGallery) {
+             if (isGallery) {
+                storyContainer.classList.add('gallery-view');
+                galleryToggleButton.classList.add('active');
+            } else {
+                storyContainer.classList.remove('gallery-view');
+                galleryToggleButton.classList.remove('active');
             }
         }
+
 
         function applyNSFWPreference(isBlurred, shouldRender = false) {
             nsfwToggle.checked = isBlurred;
@@ -131,9 +133,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         function handleGalleryToggle() {
-            const isGalleryView = storyContainer.classList.contains('gallery-view');
-            const savedLayout = localStorage.getItem(LAYOUT_PREFERENCE_KEY) || 'grid';
-            applyLayout(isGalleryView ? savedLayout : 'gallery');
+            const isGallery = storyContainer.classList.toggle('gallery-view');
+            galleryToggleButton.classList.toggle('active');
+            localStorage.setItem(GALLERY_PREFERENCE_KEY, isGallery);
         }
 
 
@@ -192,6 +194,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 controlsSection.style.display = 'none';
                 filterSection.style.display = 'none';
                 savedSortSection.style.display = 'flex';
+                galleryToggleButton.style.display = 'none';
             }
         }
         
@@ -353,6 +356,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             let finalContent = createMediaElement(story, true);
+
+            if (story.crosspost_parent_list && story.crosspost_parent_list.length > 0) {
+                 finalContent += `<div class="crosspost-info">Cross-posted from <a href="#" onclick="event.preventDefault(); window.open('https://reddit.com/r/${story.crosspost_parent_list[0].subreddit}', '_blank')">r/${story.crosspost_parent_list[0].subreddit}</a></div>`;
+            }
+
             if (storyText) {
                 finalContent += `<p>${storyText.replace(/\n/g, '<br>')}</p>`;
             }
@@ -439,24 +447,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
         function renderStories(posts) {
             storyContainer.innerHTML = '';
-            
-            // Check for Gallery Mode eligibility
-            const imagePosts = posts.filter(p => p.post_hint === 'image').length;
-            const isGalleryEligible = (imagePosts / posts.length) > 0.5;
-            galleryToggleButton.style.display = isGalleryEligible ? 'block' : 'none';
-
-            // Restore gallery view if it was active
-            if (isGalleryEligible && localStorage.getItem(GALLERY_PREFERENCE_KEY) === 'true') {
-                 applyLayout('gallery');
-            } else {
-                 applyLayout(localStorage.getItem(LAYOUT_PREFERENCE_KEY) || 'grid');
-            }
-
-
             const flairFilter = flairFilterInput.value.trim().toLowerCase();
             const filteredPosts = flairFilter 
                 ? posts.filter(story => story.link_flair_text && story.link_flair_text.toLowerCase().includes(flairFilter))
                 : posts;
+
+            const isImageHeavy = filteredPosts.filter(p => p.post_hint === 'image').length / filteredPosts.length > 0.5;
+            galleryToggleButton.style.display = isImageHeavy ? 'flex' : 'none';
+            
+            if (isImageHeavy) {
+                const isGallery = localStorage.getItem(GALLERY_PREFERENCE_KEY) === 'true';
+                applyGalleryPreference(isGallery);
+            } else {
+                applyGalleryPreference(false);
+            }
+
 
             if (filteredPosts.length === 0) {
                 storyContainer.innerHTML = `<p class="empty-state">No stories found with the current filters.</p>`;
@@ -474,12 +479,14 @@ document.addEventListener('DOMContentLoaded', () => {
             stories.forEach((story, index) => {
                 const storyCard = document.createElement('div');
                 storyCard.className = 'story-card';
+                if (story.distinguished === 'moderator') {
+                    storyCard.classList.add('moderator-post');
+                }
                 storyCard.style.animationDelay = `${index * 0.05}s`;
                 const isSaved = isStorySaved(story.id);
                 const redditLink = `https://www.reddit.com${story.permalink}`;
                 const readingTime = calculateReadingTime(story.selftext);
                 const isSensitive = story.over_18 || story.spoiler;
-                const crosspostParent = story.crosspost_parent_list?.[0];
 
                 if (shouldBlur && isSensitive) {
                     storyCard.classList.add('nsfw-blur');
@@ -496,11 +503,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     }, { once: true });
                     storyCard.appendChild(uncoverDiv);
                 }
+                
+                let crosspostHTML = '';
+                if (story.crosspost_parent_list && story.crosspost_parent_list.length > 0) {
+                    crosspostHTML = `<div class="crosspost-info">Cross-posted from <a href="#" data-subreddit="${story.crosspost_parent_list[0].subreddit}">r/${story.crosspost_parent_list[0].subreddit}</a></div>`;
+                }
 
                 storyCard.innerHTML += `
                     ${createMediaElement(story, false)}
                     <div class="story-card-content">
-                        ${crosspostParent ? `<div class="crosspost-info">Cross-posted from <a href="#" data-crosspost-sub="${crosspostParent.subreddit}">r/${crosspostParent.subreddit}</a></div>` : ''}
+                        ${crosspostHTML}
                         <div class="story-meta">
                             <span><svg viewBox="0 0 24 24"><path d="M12 2L2 12h5v10h10V12h5L12 2z"/></svg>${story.score.toLocaleString()}</span>
                             <span><svg viewBox="0 0 24 24"><path d="M21.99 4c0-1.1-.89-2-1.99-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14l4 4-.01-18z"/></svg>${story.num_comments.toLocaleString()}</span>
@@ -523,24 +535,41 @@ document.addEventListener('DOMContentLoaded', () => {
                             </div>
                         </div>
                     </div>`;
-
-                storyCard.querySelector('.read-button').addEventListener('click', () => fetchAndShowComments(story));
-                storyCard.querySelector('.author').addEventListener('click', () => handleAuthorClick(story.author));
-                storyCard.querySelector('.save-button').addEventListener('click', (e) => toggleSaveStory(e, story));
-                storyCard.querySelector('.share-button').addEventListener('click', () => {
-                    navigator.clipboard.writeText(redditLink);
-                    showToast('Link copied to clipboard!');
+                
+                storyCard.addEventListener('click', (e) => {
+                    // Don't open popup if a button, link or the author name was clicked
+                    if (e.target.closest('button, a, .author, .crosspost-info a')) {
+                        return;
+                    }
+                    fetchAndShowComments(story);
                 });
+
+                const authorEl = storyCard.querySelector('.author');
+                if(authorEl) {
+                    authorEl.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        handleAuthorClick(story.author);
+                    });
+                }
                 
                 const crosspostLink = storyCard.querySelector('.crosspost-info a');
                 if (crosspostLink) {
                     crosspostLink.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        subredditInput.value = e.target.dataset.crosspostSub;
-                        searchInput.value = '';
+                        e.stopPropagation();
+                        subredditInput.value = e.target.dataset.subreddit;
                         handleFetchClick();
                     });
                 }
+                
+                storyCard.querySelector('.save-button').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    toggleSaveStory(e, story)
+                });
+                storyCard.querySelector('.share-button').addEventListener('click', (e) => {
+                     e.stopPropagation();
+                    navigator.clipboard.writeText(redditLink);
+                    showToast('Link copied to clipboard!');
+                });
                 
                 storyContainer.appendChild(storyCard);
             });
@@ -643,7 +672,6 @@ document.addEventListener('DOMContentLoaded', () => {
         function displaySavedStories() {
             storyContainer.innerHTML = '';
             loadMoreButton.style.display = 'none';
-            galleryToggleButton.style.display = 'none';
             
             let savedStories = getSavedStories();
             const sortMethod = savedSortSelect.value;
@@ -762,5 +790,4 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.innerHTML = "<h1>A critical error occurred. Please refresh the page.</h1>";
     }
 });
-
 

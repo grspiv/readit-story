@@ -12,6 +12,7 @@
     --danger-color: #c0392b;
     --secondary-button-bg: #95a5a6;
     --secondary-button-hover: #7f8c8d;
+    --mod-color: #2ecc71; /* Color for moderator posts */
 }
 
 body.dark {
@@ -46,12 +47,20 @@ body {
                 var(--bg-color);
     background-blend-mode: multiply;
     animation: background-move 15s ease-in-out infinite alternate;
+    -webkit-animation: background-move 15s ease-in-out infinite alternate;
     transition: background-color 0.3s ease, color 0.3s ease;
+    -webkit-transition: background-color 0.3s ease, color 0.3s ease;
     -webkit-tap-highlight-color: transparent; /* Disable tap highlight on iOS */
     -webkit-text-size-adjust: 100%; /* Prevent font scaling on orientation change */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 @keyframes background-move {
+    from { background-position: 0 0, 100% 100%; }
+    to { background-position: 100% 100%, 0 0; }
+}
+@-webkit-keyframes background-move {
     from { background-position: 0 0, 100% 100%; }
     to { background-position: 100% 100%, 0 0; }
 }
@@ -99,7 +108,7 @@ body {
 }
 
 .main-content {
-    max-width: 1200px;
+    max-width: 1400px;
     margin: 0 auto;
     padding: 0 20px;
 }
@@ -219,8 +228,8 @@ body {
 
 .story-container {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 25px;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 30px;
     transition: grid-template-columns 0.4s ease;
 }
 
@@ -235,6 +244,10 @@ body {
     overflow: hidden;
     opacity: 0;
     animation: fadeIn 0.5s ease-out forwards;
+    cursor: pointer;
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    transform: translateZ(0);
 }
 
 @keyframes fadeIn {
@@ -248,9 +261,19 @@ body {
     border-color: var(--button-color);
 }
 
+.story-card.moderator-post {
+    border-left: 5px solid var(--mod-color);
+}
+
+.story-card.moderator-post .author {
+    color: var(--mod-color);
+    font-weight: bold;
+}
+
+
 .story-card-media {
     width: 100%;
-    height: 200px; /* Use a fixed height for consistency in grid view */
+    height: 200px;
     overflow: hidden;
 }
 
@@ -316,7 +339,6 @@ body {
     font-size: 0.9em;
     color: #888;
     margin-bottom: 5px;
-    cursor: pointer;
     text-decoration: none;
     transition: color 0.3s ease;
 }
@@ -484,11 +506,15 @@ body {
     border-radius: 50%;
     border-top-color: var(--button-color);
     animation: spin 1s cubic-bezier(0.68, -0.55, 0.27, 1.55) infinite;
+    -webkit-animation: spin 1s cubic-bezier(0.68, -0.55, 0.27, 1.55) infinite;
     margin: 0 auto 15px;
 }
 
 @keyframes spin {
     to { transform: rotate(360deg); }
+}
+@-webkit-keyframes spin {
+    to { -webkit-transform: rotate(360deg); }
 }
 
 .popup-overlay {
@@ -520,15 +546,16 @@ body {
     border-radius: 16px;
     width: 100%;
     max-width: 800px;
-    height: 100%;
-    max-height: 90vh;
+    height: -webkit-fill-available;
+    max-height: 90vh; /* Fallback for older browsers */
+    max-height: 90svh; /* More reliable unit for mobile */
     overflow-y: auto;
     box-shadow: 0 15px 30px rgba(0, 0, 0, 0.3);
     transform: scale(0.9);
     transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), background-color 0.3s ease;
     display: flex;
     flex-direction: column;
-    -webkit-overflow-scrolling: touch; /* Add momentum scrolling on iOS */
+    -webkit-overflow-scrolling: touch; /* Momentum scrolling on iOS */
 }
 
 .popup-overlay.active .popup-content {
@@ -734,6 +761,12 @@ input:checked + .slider:before { transform: translateX(26px); }
 .slider.round { border-radius: 24px; }
 .slider.round:before { border-radius: 50%; }
 
+
+@media (min-width: 1200px) {
+    .main-content {
+        padding: 0 40px;
+    }
+}
 
 @media (max-width: 900px) {
     .app-header h1 {
