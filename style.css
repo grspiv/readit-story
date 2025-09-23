@@ -55,9 +55,7 @@ body {
                 var(--bg-color);
     background-blend-mode: multiply;
     animation: background-move 15s ease-in-out infinite alternate;
-    -webkit-animation: background-move 15s ease-in-out infinite alternate;
     transition: background-color 0.3s ease, color 0.3s ease;
-    -webkit-transition: background-color 0.3s ease, color 0.3s ease;
     -webkit-tap-highlight-color: transparent; /* Disable tap highlight on iOS */
     -webkit-text-size-adjust: none; /* Prevent font scaling on orientation change */
     -webkit-font-smoothing: antialiased;
@@ -65,10 +63,6 @@ body {
 }
 
 @keyframes background-move {
-    from { background-position: 0 0, 100% 100%; }
-    to { background-position: 100% 100%, 0 0; }
-}
-@-webkit-keyframes background-move {
     from { background-position: 0 0, 100% 100%; }
     to { background-position: 100% 100%, 0 0; }
 }
@@ -248,7 +242,6 @@ body {
     background-color: var(--card-bg);
     transition: all 0.3s ease;
     width: 100%;
-    -webkit-appearance: none;
     appearance: none;
 }
 
@@ -272,7 +265,6 @@ body {
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
     min-width: 150px;
     text-align: center;
-    -webkit-appearance: none;
     appearance: none;
     flex-grow: 1;
 }
@@ -547,7 +539,6 @@ body {
     font-weight: bold;
     cursor: pointer;
     transition: background-color 0.3s ease, transform 0.2s ease;
-    -webkit-appearance: none;
     appearance: none;
 }
 
@@ -572,7 +563,6 @@ body {
     padding: 5px;
     color: #888;
     transition: color 0.3s, transform 0.2s;
-    -webkit-appearance: none;
     appearance: none;
 }
 
@@ -699,15 +689,11 @@ body {
     border-radius: 50%;
     border-top-color: var(--button-color);
     animation: spin 1s cubic-bezier(0.68, -0.55, 0.27, 1.55) infinite;
-    -webkit-animation: spin 1s cubic-bezier(0.68, -0.55, 0.27, 1.55) infinite;
     margin: 0 auto 15px;
 }
 
 @keyframes spin {
     to { transform: rotate(360deg); }
-}
-@-webkit-keyframes spin {
-    to { -webkit-transform: rotate(360deg); }
 }
 
 .popup-overlay {
@@ -812,7 +798,6 @@ body {
     padding: 8px;
     color: #888;
     transition: color 0.3s ease, transform 0.2s ease;
-    -webkit-appearance: none;
     appearance: none;
 }
 
@@ -1000,7 +985,6 @@ body {
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
     transition: opacity 0.3s, transform 0.3s;
     z-index: 999;
-    -webkit-appearance: none;
     appearance: none;
 }
 
@@ -1564,4 +1548,3 @@ input:checked + .slider:before { transform: translateX(26px); }
     }
 
 }
-

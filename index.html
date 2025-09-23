@@ -103,7 +103,7 @@
             </div>
         </section>
 
-        <section class="action-bar">
+        <nav class="action-bar">
             <button id="mark-all-read-button" class="action-button secondary" style="display: none;">Mark Visible as Read</button>
             <button id="view-saved-button" class="action-button secondary">Saved Stories</button>
             <button id="view-history-button" class="action-button secondary">History</button>
@@ -146,7 +146,7 @@
              <div id="clear-history-container" style="display: none;">
                 <button id="clear-history-button" class="action-button danger">Clear History</button>
             </div>
-        </section>
+        </nav>
 
         <section id="subreddit-info-panel" class="subreddit-info"></section>
 
@@ -166,10 +166,10 @@
     </main>
     
     <!-- Story Reader Popup -->
-    <div id="popup-overlay" class="popup-overlay">
+    <div id="popup-overlay" class="popup-overlay" role="dialog" aria-modal="true" aria-labelledby="popup-title">
         <div class="popup-content">
             <div id="reading-progress-bar" class="reading-progress-bar"></div>
-            <div class="popup-header">
+            <header class="popup-header">
                 <div class="popup-title-container">
                     <h2 id="popup-title" class="popup-title"></h2>
                     <div id="popup-subreddit-link" class="popup-subreddit-link"></div>
@@ -180,30 +180,30 @@
                         <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
                 </button>
-            </div>
-            <div id="jump-to-nav" class="jump-to-nav"></div>
+            </header>
+            <nav id="jump-to-nav" class="jump-to-nav"></nav>
             <div class="popup-controls"></div>
             <div id="comment-navigator" class="comment-navigator" style="display: none;"></div>
-            <div id="series-navigation" class="series-navigation"></div>
+            <section id="series-navigation" class="series-navigation"></section>
             <div id="popup-body" class="popup-body"></div>
-            <div id="saved-story-tags-container" class="saved-story-tags-container" style="display: none;">
+            <section id="saved-story-tags-container" class="saved-story-tags-container" style="display: none;">
                 <h4>Tags</h4>
                 <div id="story-tags" class="story-tags"></div>
                 <input type="text" id="add-tag-input" placeholder="Add a tag and press Enter..." aria-label="Add a tag to this story">
-            </div>
-            <div id="saved-story-notes-container" class="saved-story-notes-container" style="display: none;">
+            </section>
+            <section id="saved-story-notes-container" class="saved-story-notes-container" style="display: none;">
                 <h4>My Notes</h4>
                 <textarea id="saved-story-notes" placeholder="Add personal notes for this story..." aria-label="My notes for this story"></textarea>
-            </div>
+            </section>
         </div>
         <button id="gallery-prev" class="gallery-nav prev" style="display: none;" aria-label="Previous image">&#10094;</button>
         <button id="gallery-next" class="gallery-nav next" style="display: none;" aria-label="Next image">&#10095;</button>
     </div>
 
     <!-- User Profile Popup -->
-    <div id="user-profile-overlay" class="popup-overlay">
+    <div id="user-profile-overlay" class="popup-overlay" role="dialog" aria-modal="true" aria-labelledby="user-profile-title">
          <div class="popup-content">
-             <div class="popup-header">
+             <header class="popup-header">
                 <div class="popup-title-container">
                     <h2 id="user-profile-title" class="popup-title"></h2>
                 </div>
@@ -212,15 +212,15 @@
                         <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
                 </button>
-            </div>
+            </header>
             <div id="user-profile-body" class="popup-body"></div>
          </div>
     </div>
 
     <!-- Word Cloud Popup -->
-    <div id="word-cloud-overlay" class="popup-overlay">
+    <div id="word-cloud-overlay" class="popup-overlay" role="dialog" aria-modal="true" aria-labelledby="word-cloud-title">
          <div class="popup-content">
-             <div class="popup-header">
+             <header class="popup-header">
                 <div class="popup-title-container">
                     <h2 id="word-cloud-title" class="popup-title">Comment Word Cloud</h2>
                 </div>
@@ -229,7 +229,7 @@
                         <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
                 </button>
-            </div>
+            </header>
             <div id="word-cloud-body" class="popup-body">
                 <div id="word-cloud-container"></div>
                 <p class="word-cloud-info">A visual representation of the most common words in the comments.</p>
@@ -238,18 +238,18 @@
     </div>
 
     <!-- API Key Popup -->
-    <div id="api-key-overlay" class="popup-overlay">
+    <div id="api-key-overlay" class="popup-overlay" role="dialog" aria-modal="true" aria-labelledby="api-key-title">
         <div class="popup-content">
-            <div class="popup-header">
+            <header class="popup-header">
                 <div class="popup-title-container">
-                    <h2 class="popup-title">Enter Google AI API Key</h2>
+                    <h2 id="api-key-title" class="popup-title">Enter Google AI API Key</h2>
                 </div>
                 <button id="close-api-key-popup" class="close-button" title="Close" aria-label="Close API Key modal">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
                 </button>
-            </div>
+            </header>
             <div id="api-key-body" class="popup-body">
                 <p>To use the AI-powered features (Summarize, Narrate, Translate), you need a Google AI API key.</p>
                 <p>
@@ -273,4 +273,3 @@
     <script src="script.js"></script>
 </body>
 </html>
-
