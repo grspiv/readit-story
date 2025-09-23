@@ -185,7 +185,18 @@
             <div class="popup-controls"></div>
             <div id="comment-navigator" class="comment-navigator" style="display: none;"></div>
             <div id="series-navigation" class="series-navigation"></div>
-            <div id="popup-body" class="popup-body"></div>
+            <div id="popup-body" class="popup-body">
+                <div id="ai-features-container">
+                    <div id="ai-summary-container" class="ai-output-box" style="display: none;">
+                        <h4>AI Summary</h4>
+                        <div id="ai-summary-content" class="markdown-content"></div>
+                    </div>
+                    <div id="ai-translation-container" class="ai-output-box" style="display: none;">
+                        <h4>Translation</h4>
+                        <div id="ai-translation-content" class="markdown-content"></div>
+                    </div>
+                </div>
+            </div>
             <div id="saved-story-tags-container" class="saved-story-tags-container" style="display: none;">
                 <h4>Tags</h4>
                 <div id="story-tags" class="story-tags"></div>
@@ -235,6 +246,34 @@
                 <p class="word-cloud-info">A visual representation of the most common words in the comments.</p>
             </div>
          </div>
+    </div>
+
+    <!-- API Key Popup -->
+    <div id="api-key-overlay" class="popup-overlay">
+        <div class="popup-content">
+            <div class="popup-header">
+                <div class="popup-title-container">
+                    <h2 class="popup-title">Enter Google AI API Key</h2>
+                </div>
+                <button id="close-api-key-popup" class="close-button" title="Close" aria-label="Close API Key modal">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+            </div>
+            <div id="api-key-body" class="popup-body">
+                <p>To use the AI-powered features (Summarize, Narrate, Translate), you need a Google AI API key.</p>
+                <p>
+                    <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Click here to get your API key from Google AI Studio</a>, then paste it below.
+                </p>
+                <p class="api-key-note">Your key is saved only in your browser's local storage and is never sent to our servers.</p>
+                <div class="input-group">
+                    <label for="api-key-input">Your API Key:</label>
+                    <input type="password" id="api-key-input" class="text-input" placeholder="Paste your API key here">
+                </div>
+                <button id="save-api-key-button" class="action-button">Save and Continue</button>
+            </div>
+        </div>
     </div>
     
     <button id="back-to-top" class="back-to-top" title="Go to top" aria-label="Back to top">

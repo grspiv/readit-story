@@ -72,6 +72,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const storyTags = document.getElementById('story-tags');
         const addTagInput = document.getElementById('add-tag-input');
         const quickLookPopup = document.getElementById('quick-look-popup');
+        const aiSummaryContainer = document.getElementById('ai-summary-container');
+        const aiSummaryContent = document.getElementById('ai-summary-content');
+        const aiTranslationContainer = document.getElementById('ai-translation-container');
+        const aiTranslationContent = document.getElementById('ai-translation-content');
+        const apiKeyOverlay = document.getElementById('api-key-overlay');
+        const closeApiKeyPopup = document.getElementById('close-api-key-popup');
+        const saveApiKeyButton = document.getElementById('save-api-key-button');
+        const apiKeyInput = document.getElementById('api-key-input');
 
 
         // --- Constants & State ---
@@ -101,6 +109,11 @@ document.addEventListener('DOMContentLoaded', () => {
         let liveCommentsInterval = null;
         let activeTagFilter = null;
         let quickLookTimeout = null;
+        let audioPlayer = null;
+        let audioContext;
+        let audioSource;
+        let apiKeyPromiseResolve = null;
+        let apiKeyPromiseReject = null;
 
         // --- Initialization ---
         const savedTheme = localStorage.getItem('theme') || 'light';
@@ -177,6 +190,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 positionQuickLook(e);
             }
         });
+        closeApiKeyPopup.addEventListener('click', () => hideApiKeyModal(true)); // Pass true to indicate rejection
+        saveApiKeyButton.addEventListener('click', handleSaveApiKey);
+
 
         // --- Main View Controller ---
         function switchToView(view, options = {}) {
@@ -366,7 +382,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         function closePopup() {
             saveReadingPosition(); // Save position on close
-            window.speechSynthesis.cancel();
+            if (audioPlayer && !audioPlayer.paused) {
+                audioPlayer.pause();
+                audioPlayer.src = '';
+            }
             if (liveCommentsInterval) {
                 clearInterval(liveCommentsInterval);
                 liveCommentsInterval = null;
@@ -378,6 +397,8 @@ document.addEventListener('DOMContentLoaded', () => {
             galleryPrevButton.style.display = 'none';
             galleryNextButton.style.display = 'none';
             currentStoryId = null;
+            aiSummaryContainer.style.display = 'none';
+            aiTranslationContainer.style.display = 'none';
         }
 
         function handleScroll() {
@@ -538,11 +559,26 @@ document.addEventListener('DOMContentLoaded', () => {
             
             popupControls.innerHTML = `
                 <div class="popup-actions-left">
-                    <button id="read-aloud-toggle" class="action-button secondary">Read Aloud</button>
+                    <button id="summarize-button" class="action-button secondary">Summarize</button>
                     <button id="word-cloud-button" class="action-button secondary">Word Cloud</button>
                     <button id="live-comments-button" class="action-button secondary">Live Comments</button>
                 </div>
                 <div class="popup-actions-right">
+                    <div class="narration-controls">
+                        <button id="narrate-button" class="action-button secondary">Narrate Story</button>
+                        <audio id="tts-audio-player" style="display:none;"></audio>
+                    </div>
+                     <div class="translation-controls">
+                        <label for="translation-select">Translate:</label>
+                        <select id="translation-select" class="dropdown-input">
+                            <option value="">Original</option>
+                            <option value="Spanish">Spanish</option>
+                            <option value="French">French</option>
+                            <option value="German">German</option>
+                            <option value="Japanese">Japanese</option>
+                            <option value="Mandarin Chinese">Mandarin Chinese</option>
+                        </select>
+                    </div>
                      <div class="reading-controls">
                         <span>Font Size:</span>
                         <button id="font-size-down" class="icon-button" title="Decrease Font Size" aria-label="Decrease font size">A-</button>
@@ -571,6 +607,10 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             document.getElementById('word-cloud-button').addEventListener('click', () => generateWordCloud(story));
             document.getElementById('live-comments-button').addEventListener('click', toggleLiveComments);
+            document.getElementById('summarize-button').addEventListener('click', () => handleSummarize(story));
+            document.getElementById('narrate-button').addEventListener('click', () => handleNarration(story));
+            document.getElementById('translation-select').addEventListener('change', (e) => handleTranslation(story, e.target.value));
+
             
             let headerActions = header.querySelector('.popup-header-actions');
             if (!headerActions) {
@@ -637,6 +677,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (searchQueryForHighlight) {
                 storyText = highlightKeywords(storyText, searchQueryForHighlight);
             }
+            const aiFeaturesContainer = popupBody.querySelector('#ai-features-container');
 
             let finalContent = `<div id="story-content-wrapper">`;
             finalContent += createMediaElement(story, true);
@@ -651,7 +692,7 @@ document.addEventListener('DOMContentLoaded', () => {
             finalContent += `</div>`;
             
             finalContent += `<hr><div id="comment-section" data-op-author="${story.author}"></div>`;
-            popupBody.innerHTML = finalContent;
+            popupBody.insertAdjacentHTML('afterbegin', finalContent);
             
             await fetchCommentsForCurrentStory('confidence');
             restoreReadingPosition(story.id); // Restore position after content is loaded
@@ -1357,58 +1398,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         function setupReadingControls(story) {
-            const readAloudToggle = document.getElementById('read-aloud-toggle');
             const fontSizeUp = document.getElementById('font-size-up');
             const fontSizeDown = document.getElementById('font-size-down');
             const lineHeightUp = document.getElementById('line-height-up');
             const lineHeightDown = document.getElementById('line-height-down');
             
-            readAloudToggle.addEventListener('click', () => handleReadAloudClick(story));
-
             fontSizeUp.addEventListener('click', () => updateReadingSetting('fontSize', 0.1));
             fontSizeDown.addEventListener('click', () => updateReadingSetting('fontSize', -0.1));
             lineHeightUp.addEventListener('click', () => updateReadingSetting('lineHeight', 0.1));
             lineHeightDown.addEventListener('click', () => updateReadingSetting('lineHeight', -0.1));
-        }
-
-        function handleReadAloudClick(story) {
-            const toggleBtn = document.getElementById('read-aloud-toggle');
-            if (speechSynthesis.paused && currentUtterance) {
-                speechSynthesis.resume();
-            } else if (speechSynthesis.speaking && currentUtterance) {
-                speechSynthesis.pause();
-            } else {
-                speechSynthesis.cancel(); // Clear queue
-                let textToRead = `Title: ${story.title}. By user ${story.author}. ${story.selftext}. `;
-                const comments = popupBody.querySelectorAll('.comment-card');
-                if (comments.length > 0) {
-                    textToRead += " Now for the top comments. ";
-                    comments.forEach(comment => {
-                        if (comment.classList.contains('collapsed')) return;
-                        const author = comment.dataset.commentAuthor;
-                        const body = comment.querySelector('.comment-body').textContent;
-                        textToRead += `Comment from user ${author}. ${body}. `;
-                    });
-                }
-                
-                currentUtterance = new SpeechSynthesisUtterance(textToRead);
-                
-                currentUtterance.onstart = () => { toggleBtn.textContent = 'Pause'; };
-                currentUtterance.onpause = () => { toggleBtn.textContent = 'Resume'; };
-                currentUtterance.onresume = () => { toggleBtn.textContent = 'Pause'; };
-                currentUtterance.onend = () => {
-                    toggleBtn.textContent = 'Read Aloud';
-                    currentUtterance = null;
-                };
-                currentUtterance.onerror = (event) => {
-                    console.error('Speech synthesis error:', event.error);
-                    showToast('Sorry, text-to-speech is not available.');
-                    toggleBtn.textContent = 'Read Aloud';
-                    currentUtterance = null;
-                };
-                
-                speechSynthesis.speak(currentUtterance);
-            }
         }
 
         function updateReadingSetting(setting, change) {
@@ -2048,6 +2046,223 @@ document.addEventListener('DOMContentLoaded', () => {
             quickLookPopup.style.left = `${x}px`;
             quickLookPopup.style.top = `${y}px`;
         }
+        
+        // --- AI Feature & API Key Functions ---
+        function showApiKeyModal() {
+            return new Promise((resolve, reject) => {
+                apiKeyPromiseResolve = resolve;
+                apiKeyPromiseReject = reject;
+                apiKeyInput.value = '';
+                apiKeyOverlay.classList.add('active');
+            });
+        }
+
+        function hideApiKeyModal(isRejected = false) {
+            apiKeyOverlay.classList.remove('active');
+            if (isRejected && apiKeyPromiseReject) {
+                apiKeyPromiseReject(new Error("API Key not provided."));
+            }
+            apiKeyPromiseResolve = null;
+            apiKeyPromiseReject = null;
+        }
+
+        function handleSaveApiKey() {
+            const key = apiKeyInput.value.trim();
+            if (key) {
+                localStorage.setItem('geminiApiKey', key);
+                if (apiKeyPromiseResolve) {
+                    apiKeyPromiseResolve(key);
+                }
+                hideApiKeyModal();
+                showToast("API Key saved successfully!");
+            } else {
+                showToast("Please enter a valid API Key.");
+            }
+        }
+
+        async function getGeminiApiKey() {
+            let key = localStorage.getItem('geminiApiKey');
+            if (!key) {
+                try {
+                    key = await showApiKeyModal();
+                    return key;
+                } catch (error) {
+                    console.error(error.message);
+                    throw error;
+                }
+            }
+            return key;
+        }
+
+        async function callGeminiAPI(prompt) {
+            try {
+                const apiKey = await getGeminiApiKey();
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+                const payload = {
+                    contents: [{ parts: [{ text: prompt }] }],
+                };
+                
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    const errorBody = await response.json();
+                    console.error("Gemini API Error:", errorBody);
+                    if (response.status === 400 || response.status === 403) { 
+                        localStorage.removeItem('geminiApiKey'); 
+                        throw new Error(`API Error: Invalid API key. Please check your key and try again.`);
+                    }
+                    throw new Error(`API Error: ${errorBody.error.message}`);
+                }
+                
+                const result = await response.json();
+                const candidate = result.candidates?.[0];
+
+                if (candidate && candidate.content?.parts?.[0]?.text) {
+                    return candidate.content.parts[0].text;
+                } else {
+                    throw new Error("Invalid response structure from API.");
+                }
+            } catch (error) {
+                console.error("Error calling Gemini API:", error);
+                showToast(error.message);
+                throw error; 
+            }
+        }
+
+        async function handleSummarize(story) {
+            if (!story.selftext) {
+                showToast("This story has no text to summarize.");
+                return;
+            }
+            const summarizeButton = document.getElementById('summarize-button');
+            summarizeButton.disabled = true;
+            summarizeButton.textContent = 'Summarizing...';
+            aiSummaryContainer.style.display = 'block';
+            aiSummaryContent.innerHTML = '<div class="spinner"></div>';
+
+            try {
+                const prompt = `Summarize the following story in a single, well-written paragraph. Be concise and capture the main points:\n\n---\n\n${story.selftext}`;
+                const summary = await callGeminiAPI(prompt);
+                aiSummaryContent.innerHTML = renderMarkdown(summary);
+            } catch (error) {
+                aiSummaryContent.innerHTML = `<p>Sorry, the summary could not be generated. ${error.message}</p>`;
+            } finally {
+                summarizeButton.disabled = false;
+                summarizeButton.textContent = 'Summarize';
+            }
+        }
+
+        async function handleTranslation(story, language) {
+            aiTranslationContainer.style.display = language ? 'block' : 'none';
+            if (!language) return;
+
+            if (!story.selftext) {
+                aiTranslationContent.innerHTML = '<p>This story has no text to translate.</p>';
+                return;
+            }
+
+            aiTranslationContent.innerHTML = '<div class="spinner"></div>';
+            
+            try {
+                const prompt = `Translate the following text to ${language}. Return only the translated text, without any introductory phrases:\n\n---\n\n${story.selftext}`;
+                const translation = await callGeminiAPI(prompt);
+                aiTranslationContent.innerHTML = renderMarkdown(translation);
+            } catch (error) {
+                aiTranslationContent.innerHTML = `<p>Sorry, the translation could not be generated. ${error.message}</p>`;
+            }
+        }
+        
+        async function handleNarration(story) {
+            const narrateButton = document.getElementById('narrate-button');
+            audioPlayer = document.getElementById('tts-audio-player');
+        
+            if (audioPlayer && !audioPlayer.paused) {
+                audioPlayer.pause();
+                narrateButton.textContent = 'Narrate Story';
+                return;
+            }
+        
+            if (audioPlayer && audioPlayer.paused && audioPlayer.src) {
+                audioPlayer.play();
+                narrateButton.textContent = 'Pause Narration';
+                return;
+            }
+        
+            if (!story.selftext) {
+                showToast("This story has no text to narrate.");
+                return;
+            }
+        
+            narrateButton.disabled = true;
+            narrateButton.textContent = 'Generating...';
+        
+            try {
+                const apiKey = await getGeminiApiKey();
+                const textToNarrate = `Title: ${story.title}. By user ${story.author}. ${story.selftext}`;
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
+        
+                const payload = {
+                    contents: [{ parts: [{ text: textToNarrate }] }],
+                    generationConfig: {
+                        responseModalities: ["AUDIO"],
+                    },
+                    model: "gemini-2.5-flash-preview-tts"
+                };
+        
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+        
+                if (!response.ok) {
+                    if(response.status === 400 || response.status === 403){
+                        localStorage.removeItem('geminiApiKey');
+                    }
+                    throw new Error('Failed to generate audio. Your API key might be invalid.');
+                }
+        
+                const result = await response.json();
+                const part = result?.candidates?.[0]?.content?.parts?.[0];
+                const audioData = part?.inlineData?.data;
+                const mimeType = part?.inlineData?.mimeType;
+        
+                if (audioData && mimeType && mimeType.startsWith("audio/")) {
+                    const sampleRate = parseInt(mimeType.match(/rate=(\d+)/)[1], 10);
+                    const pcmData = base64ToArrayBuffer(audioData);
+                    const pcm16 = new Int16Array(pcmData);
+                    const wavBlob = pcmToWav(pcm16, sampleRate);
+                    const audioUrl = URL.createObjectURL(wavBlob);
+        
+                    audioPlayer.src = audioUrl;
+                    audioPlayer.style.display = 'inline-block';
+                    audioPlayer.controls = true;
+                    audioPlayer.play();
+        
+                    narrateButton.textContent = 'Pause Narration';
+                    audioPlayer.onpause = () => narrateButton.textContent = 'Resume Narration';
+                    audioPlayer.onplay = () => narrateButton.textContent = 'Pause Narration';
+                    audioPlayer.onended = () => {
+                        narrateButton.textContent = 'Narrate Story';
+                        audioPlayer.src = '';
+                        audioPlayer.style.display = 'none';
+                    };
+                } else {
+                    throw new Error("No audio data received from API.");
+                }
+            } catch (error) {
+                console.error("Narration Error:", error);
+                showToast(error.message || "Could not generate narration.");
+                narrateButton.textContent = 'Narrate Story';
+            } finally {
+                narrateButton.disabled = false;
+            }
+        }
 
 
         // --- Utility Functions ---
@@ -2058,6 +2273,57 @@ document.addEventListener('DOMContentLoaded', () => {
                 clearTimeout(timeout);
                 timeout = setTimeout(() => func.apply(context, args), delay);
             };
+        }
+        
+        // --- TTS Audio Helper Functions ---
+        function base64ToArrayBuffer(base64) {
+            const binaryString = window.atob(base64);
+            const len = binaryString.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            return bytes.buffer;
+        }
+
+        function pcmToWav(pcmData, sampleRate) {
+            const numChannels = 1;
+            const bitsPerSample = 16;
+            const blockAlign = (numChannels * bitsPerSample) / 8;
+            const byteRate = sampleRate * blockAlign;
+            const dataSize = pcmData.length * (bitsPerSample / 8);
+            const buffer = new ArrayBuffer(44 + dataSize);
+            const view = new DataView(buffer);
+
+            // RIFF header
+            writeString(view, 0, 'RIFF');
+            view.setUint32(4, 36 + dataSize, true);
+            writeString(view, 8, 'WAVE');
+            // fmt chunk
+            writeString(view, 12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true); // PCM
+            view.setUint16(22, numChannels, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, byteRate, true);
+            view.setUint16(32, blockAlign, true);
+            view.setUint16(34, bitsPerSample, true);
+            // data chunk
+            writeString(view, 36, 'data');
+            view.setUint32(40, dataSize, true);
+
+            // Write PCM data
+            for (let i = 0; i < pcmData.length; i++) {
+                view.setInt16(44 + i * 2, pcmData[i], true);
+            }
+
+            return new Blob([view], { type: 'audio/wav' });
+        }
+
+        function writeString(view, offset, string) {
+            for (let i = 0; i < string.length; i++) {
+                view.setUint8(offset + i, string.charCodeAt(i));
+            }
         }
 
 
