@@ -537,10 +537,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>`;
                 
                 storyCard.addEventListener('click', (e) => {
-                    // Don't open popup if a button, link or the author name was clicked
                     if (e.target.closest('button, a, .author, .crosspost-info a')) {
                         return;
                     }
+                    fetchAndShowComments(story);
+                });
+
+                storyCard.querySelector('.read-button').addEventListener('click', (e) => {
+                    e.stopPropagation();
                     fetchAndShowComments(story);
                 });
 
