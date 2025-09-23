@@ -63,6 +63,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const savedStoryNotes = document.getElementById('saved-story-notes');
         const markAllReadButton = document.getElementById('mark-all-read-button');
         const commentNavigator = document.getElementById('comment-navigator');
+        const wordCloudOverlay = document.getElementById('word-cloud-overlay');
+        const closeWordCloudPopup = document.getElementById('close-word-cloud-popup');
+        const wordCloudContainer = document.getElementById('word-cloud-container');
 
 
         // --- Constants & State ---
@@ -76,6 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const READING_SETTINGS_KEY = 'redditStorytellerReading';
         const COLLAPSE_COMMENTS_KEY = 'redditStorytellerCollapseComments';
         const STORY_NOTES_KEY = 'redditStorytellerNotes';
+        const READING_POSITION_KEY = 'redditStorytellerReadingPosition';
         const RANDOM_SUBREDDITS = ['nosleep', 'LetsNotMeet', 'glitch_in_the_matrix', 'tifu', 'confession', 'maliciouscompliance', 'talesfromtechsupport', 'WritingPrompts', 'shortscarystories', 'UnresolvedMysteries', 'ProRevenge', 'IDontWorkHereLady', 'talesfromretail', 'pettyrevenge', 'entitledparents'];
         
         let currentView = 'browsing'; // browsing, saved, history
@@ -142,11 +146,13 @@ document.addEventListener('DOMContentLoaded', () => {
         popupOverlay.addEventListener('click', (e) => e.target === popupOverlay && closePopup());
         closeUserProfilePopup.addEventListener('click', closeUserProfilePopupHandler);
         userProfileOverlay.addEventListener('click', (e) => e.target === userProfileOverlay && closeUserProfilePopupHandler());
+        closeWordCloudPopup.addEventListener('click', () => wordCloudOverlay.classList.remove('active'));
+        wordCloudOverlay.addEventListener('click', (e) => e.target === wordCloudOverlay && wordCloudOverlay.classList.remove('active'));
         window.addEventListener('scroll', handleScroll);
         backToTopButton.addEventListener('click', scrollToTop);
         document.addEventListener('keydown', handleKeyboardNav);
         popupBody.addEventListener('click', handlePopupBodyClick);
-        popupBody.addEventListener('scroll', handlePopupScroll);
+        popupBody.addEventListener('scroll', debounce(handlePopupScroll, 100));
         toggleFiltersButton.addEventListener('click', () => {
             advancedFilters.classList.toggle('open');
             toggleFiltersButton.classList.toggle('active');
@@ -341,6 +347,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         function closePopup() {
+            saveReadingPosition(); // Save position on close
             window.speechSynthesis.cancel();
             popupOverlay.classList.remove('active');
             document.body.style.overflow = 'auto';
@@ -348,6 +355,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (video) video.pause();
             galleryPrevButton.style.display = 'none';
             galleryNextButton.style.display = 'none';
+            currentStoryId = null;
         }
 
         function handleScroll() {
@@ -509,6 +517,7 @@ document.addEventListener('DOMContentLoaded', () => {
             popupControls.innerHTML = `
                 <div class="popup-actions-left">
                     <button id="read-aloud-toggle" class="action-button secondary">Read Aloud</button>
+                    <button id="word-cloud-button" class="action-button secondary">Word Cloud</button>
                 </div>
                 <div class="popup-actions-right">
                      <div class="reading-controls">
@@ -534,9 +543,10 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
 
             setupReadingControls(story);
-             document.getElementById('comment-sort-select').addEventListener('change', (e) => {
+            document.getElementById('comment-sort-select').addEventListener('change', (e) => {
                 fetchCommentsForCurrentStory(e.target.value);
             });
+            document.getElementById('word-cloud-button').addEventListener('click', () => generateWordCloud(story));
             
             let headerActions = header.querySelector('.popup-header-actions');
             if (!headerActions) {
@@ -616,7 +626,8 @@ document.addEventListener('DOMContentLoaded', () => {
             finalContent += `<hr><div id="comment-section" data-op-author="${story.author}"></div>`;
             popupBody.innerHTML = finalContent;
             
-            fetchCommentsForCurrentStory('confidence');
+            await fetchCommentsForCurrentStory('confidence');
+            restoreReadingPosition(story.id); // Restore position after content is loaded
             findSeries(story);
         }
 
@@ -1046,6 +1057,7 @@ document.addEventListener('DOMContentLoaded', () => {
         function handleClearHistory() {
             if (confirm("Are you sure you want to clear your reading history? This cannot be undone.")) {
                 localStorage.removeItem(READ_HISTORY_KEY);
+                localStorage.removeItem(READING_POSITION_KEY); // Also clear reading positions
                 displayHistory();
                 renderFilteredStories();
             }
@@ -1375,6 +1387,7 @@ document.addEventListener('DOMContentLoaded', () => {
         function handleKeyboardNav(e) {
             const isPopupActive = popupOverlay.classList.contains('active');
             const isProfileActive = userProfileOverlay.classList.contains('active');
+            const isWordCloudActive = wordCloudOverlay.classList.contains('active');
             const isTyping = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName);
 
             if (isTyping) return;
@@ -1389,6 +1402,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 case 'Escape':
                     if (isPopupActive) closePopup();
                     if (isProfileActive) closeUserProfilePopupHandler();
+                    if (isWordCloudActive) wordCloudOverlay.classList.remove('active');
                     break;
                 case 'j':
                     if (!isPopupActive && !isProfileActive) {
@@ -1398,7 +1412,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             setActiveCard(cards[currentIndex]);
                         }
                     } else if (isPopupActive) {
-                        // Navigate comments with j/k in popup
+                        e.preventDefault();
+                        navigateComments(1);
                     }
                     break;
                 case 'k':
@@ -1408,6 +1423,9 @@ document.addEventListener('DOMContentLoaded', () => {
                             currentIndex--;
                             setActiveCard(cards[currentIndex]);
                         }
+                    } else if (isPopupActive) {
+                        e.preventDefault();
+                        navigateComments(-1);
                     }
                     break;
                 case 'o':
@@ -1562,7 +1580,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (topLevelComments.length === 0) return;
 
             // Remove highlight from previous comment
-            if (currentCommentIndex > -1) {
+            if (currentCommentIndex > -1 && topLevelComments[currentCommentIndex]) {
                 topLevelComments[currentCommentIndex].classList.remove('active-comment');
             }
             
@@ -1680,9 +1698,116 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         function saveStoryNote() {
+            if (!currentStoryId) return;
             const notes = getStoryNotes();
             notes[currentStoryId] = savedStoryNotes.value;
             localStorage.setItem(STORY_NOTES_KEY, JSON.stringify(notes));
+        }
+
+        // --- Reading Position Functions ---
+        function getReadingPositions() {
+            return JSON.parse(localStorage.getItem(READING_POSITION_KEY)) || {};
+        }
+
+        function saveReadingPosition() {
+            if (!currentStoryId) return;
+            const positions = getReadingPositions();
+            positions[currentStoryId] = popupBody.scrollTop;
+            localStorage.setItem(READING_POSITION_KEY, JSON.stringify(positions));
+        }
+
+        function restoreReadingPosition(storyId) {
+            const positions = getReadingPositions();
+            const savedPosition = positions[storyId];
+            if (savedPosition) {
+                setTimeout(() => {
+                    popupBody.scrollTop = savedPosition;
+                }, 100); // Small delay to allow content to render
+            }
+        }
+
+        // --- Word Cloud Functions ---
+        function generateWordCloud(story) {
+            wordCloudContainer.innerHTML = '<div class="spinner"></div>';
+            wordCloudOverlay.classList.add('active');
+
+            setTimeout(() => { // Use timeout to allow spinner to render
+                try {
+                    const commentNodes = popupBody.querySelectorAll('.comment-body');
+                    let allText = '';
+                    commentNodes.forEach(node => {
+                        allText += node.innerText + ' ';
+                    });
+
+                    if (allText.trim().length === 0) {
+                        wordCloudContainer.innerHTML = '<p>Not enough comment text to generate a word cloud.</p>';
+                        return;
+                    }
+
+                    const words = processTextForWordCloud(allText);
+                    drawWordCloud(words);
+                } catch (error) {
+                    console.error("Word cloud generation failed:", error);
+                    wordCloudContainer.innerHTML = '<p>Sorry, the word cloud could not be generated.</p>';
+                }
+            }, 50);
+        }
+        
+        function processTextForWordCloud(text) {
+             const stopWords = new Set(["i","me","my","myself","we","our","ours","ourselves","you","your","yours","yourself","yourselves","he","him","his","himself","she","her","hers","herself","it","its","itself","they","them","their","theirs","themselves","what","which","who","whom","this","that","these","those","am","is","are","was","were","be","been","being","have","has","had","having","do","does","did","doing","a","an","the","and","but","if","or","because","as","until","while","of","at","by","for","with","about","against","between","into","through","during","before","after","above","below","to","from","up","down","in","out","on","off","over","under","again","further","then","once","here","there","when","where","why","how","all","any","both","each","few","more","most","other","some","such","no","nor","not","only","own","same","so","than","too","very","s","t","can","will","just","don","should","now",""]);
+            const counts = {};
+            const words = text.toLowerCase().match(/\b\w+/g) || [];
+            
+            words.forEach(word => {
+                if (!stopWords.has(word) && isNaN(word)) {
+                    counts[word] = (counts[word] || 0) + 1;
+                }
+            });
+
+            return Object.entries(counts)
+                .map(([text, size]) => ({ text, size }))
+                .sort((a, b) => b.size - a.size)
+                .slice(0, 150); // Limit to top 150 words
+        }
+
+        function drawWordCloud(words) {
+            wordCloudContainer.innerHTML = '';
+            const width = wordCloudContainer.clientWidth;
+            const height = 400;
+
+            const isDarkTheme = document.body.classList.contains('dark');
+            const colorScale = d3.scaleOrdinal(isDarkTheme ? 
+                ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"] : // Vibrant colors for dark bg
+                d3.schemeCategory10); // Default for light bg
+
+            const layout = d3.layout.cloud()
+                .size([width, height])
+                .words(words.map(d => ({ text: d.text, size: 10 + Math.sqrt(d.size) * 7 }))) // Adjusted scaling
+                .padding(5)
+                .rotate(() => (Math.random() > 0.85 ? 90 : 0)) // Mostly horizontal
+                .font(window.getComputedStyle(document.body).fontFamily) // Use body font
+                .fontSize(d => d.size)
+                .on("end", draw);
+
+            layout.start();
+
+            function draw(words) {
+                const svg = d3.select(wordCloudContainer).append("svg")
+                    .attr("width", layout.size()[0])
+                    .attr("height", layout.size()[1])
+                    .append("g")
+                    .attr("transform", "translate(" + layout.size()[0] / 2 + "," + layout.size()[1] / 2 + ")");
+                
+                svg.selectAll("text")
+                    .data(words)
+                    .enter().append("text")
+                    .style("font-size", d => d.size + "px")
+                    .style("font-family", window.getComputedStyle(document.body).fontFamily)
+                    .style("fill", (d, i) => colorScale(i))
+                    .attr("text-anchor", "middle")
+                    .attr("transform", d => `translate(${[d.x, d.y]})rotate(${d.rotate})`)
+                    .text(d => d.text);
+            }
         }
 
         // --- Utility Functions ---
