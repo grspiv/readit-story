@@ -17,7 +17,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const backToTopButton = document.getElementById('back-to-top');
         const timeRangeControls = document.getElementById('time-range-controls');
         const timeRangeSelect = document.getElementById('time-range-select');
-        const loadMoreButton = document.getElementById('load-more-button');
         const viewSavedButton = document.getElementById('view-saved-button');
         const storiesHeading = document.getElementById('stories-heading');
         const controlsSection = document.querySelector('.controls');
@@ -36,10 +35,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const layoutIconGrid = document.getElementById('layout-icon-grid');
         const layoutIconList = document.getElementById('layout-icon-list');
         const nsfwToggle = document.getElementById('nsfw-toggle');
+        const infiniteScrollLoader = document.getElementById('infinite-scroll-loader');
 
         // --- Constants & State ---
         const REDDIT_API_BASE_URL = 'https://www.reddit.com/r/';
         const SAVED_STORIES_KEY = 'redditStorytellerSaved';
+        const READ_STORIES_KEY = 'redditStorytellerRead';
         const SUBREDDIT_HISTORY_KEY = 'redditStorytellerHistory';
         const LAYOUT_PREFERENCE_KEY = 'redditStorytellerLayout';
         const GALLERY_PREFERENCE_KEY = 'redditStorytellerGallery';
@@ -50,6 +51,8 @@ document.addEventListener('DOMContentLoaded', () => {
         let isShowingSaved = false;
         let allFetchedPosts = [];
         let currentSearchQuery = '';
+        let isLoadingMore = false;
+        let currentStoryId = null;
 
         // --- Initialization ---
         const savedTheme = localStorage.getItem('theme') || 'light';
@@ -73,7 +76,6 @@ document.addEventListener('DOMContentLoaded', () => {
         nsfwToggle.addEventListener('change', () => applyNSFWPreference(nsfwToggle.checked, true));
         fetchButton.addEventListener('click', handleFetchClick);
         randomButton.addEventListener('click', handleRandomClick);
-        loadMoreButton.addEventListener('click', handleLoadMoreClick);
         sortSelect.addEventListener('change', handleSortChange);
         viewSavedButton.addEventListener('click', handleViewSavedClick);
         clearSavedButton.addEventListener('click', handleClearSaved);
@@ -81,12 +83,13 @@ document.addEventListener('DOMContentLoaded', () => {
         importSavedButton.addEventListener('click', () => importFileInput.click());
         importFileInput.addEventListener('change', handleImportFile);
         savedSortSelect.addEventListener('change', displaySavedStories);
-        flairFilterInput.addEventListener('input', () => renderStories(allFetchedPosts));
+        flairFilterInput.addEventListener('input', () => renderFilteredStories());
         closePopupButton.addEventListener('click', closePopup);
         popupOverlay.addEventListener('click', (e) => e.target === popupOverlay && closePopup());
-        window.onscroll = handleScroll;
+        window.addEventListener('scroll', handleScroll);
         backToTopButton.addEventListener('click', scrollToTop);
         document.addEventListener('keydown', handleKeyboardNav);
+        popupBody.addEventListener('click', handlePopupBodyClick);
 
         // --- Functions ---
         function applyTheme(theme) {
@@ -126,7 +129,7 @@ document.addEventListener('DOMContentLoaded', () => {
             nsfwToggle.checked = isBlurred;
             localStorage.setItem(NSFW_PREFERENCE_KEY, isBlurred);
             if (shouldRender) {
-                renderStories(allFetchedPosts);
+                renderFilteredStories();
             }
         }
         
@@ -170,7 +173,7 @@ document.addEventListener('DOMContentLoaded', () => {
             handleFetchClick();
         }
 
-        function handleLoadMoreClick() {
+        function handleLoadMore() {
             const subreddit = subredditInput.value.trim();
             const sort = sortSelect.value;
             const timeRange = timeRangeSelect.value;
@@ -219,6 +222,12 @@ document.addEventListener('DOMContentLoaded', () => {
         function handleScroll() {
             const shouldShow = document.body.scrollTop > 100 || document.documentElement.scrollTop > 100;
             backToTopButton.style.display = shouldShow ? "flex" : "none";
+            
+            if (!isLoadingMore && !isShowingSaved && currentAfterToken) {
+                 if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 500) {
+                    handleLoadMore();
+                }
+            }
         }
 
         function scrollToTop() {
@@ -244,28 +253,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
         function showLoading(show, isLoadMore) {
             if (isLoadMore) {
-                loadingIndicator.style.display = 'none';
-                if (show) loadMoreButton.classList.add('pulse-active');
-                else loadMoreButton.classList.remove('pulse-active');
+                infiniteScrollLoader.style.display = show ? 'flex' : 'none';
             } else {
                 loadingIndicator.style.display = show ? 'flex' : 'none';
-                if (show) {
-                    fetchButton.classList.add('pulse-active');
-                } else {
-                    fetchButton.classList.remove('pulse-active');
-                }
             }
         }
 
         async function fetchStories(subreddit, sort, timeRange = 'all', loadMore = false, query = '') {
+            if (isLoadingMore) return;
+            isLoadingMore = true;
+
             if (!loadMore) {
                 if (!subreddit.includes('+') && !query.toLowerCase().startsWith('author:')) saveSubredditToHistory(subreddit);
                 allFetchedPosts = [];
                 currentAfterToken = null;
                 flairFilterInput.value = '';
+                storyContainer.innerHTML = '';
             }
+            
             showLoading(true, loadMore);
-            loadMoreButton.style.display = 'none';
             storiesHeading.textContent = query ? `Searching for "${query}" in r/${subreddit}` : `Showing stories from r/${subreddit}`;
             
             let redditUrl;
@@ -284,10 +290,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const data = await response.json();
                 const newPosts = data.data.children.map(p => p.data);
+                
                 allFetchedPosts = allFetchedPosts.concat(newPosts);
                 currentAfterToken = data.data.after;
 
-                renderStories(allFetchedPosts);
+                displayStories(newPosts);
+                renderFilteredStories();
+
 
             } catch (error) {
                 console.error("Failed to fetch stories:", error);
@@ -295,32 +304,51 @@ document.addEventListener('DOMContentLoaded', () => {
                 storyContainer.innerHTML = '';
             } finally {
                 showLoading(false, loadMore);
-                if (currentAfterToken && !isShowingSaved) {
-                    loadMoreButton.style.display = 'block';
-                }
+                isLoadingMore = false;
             }
         }
 
         async function fetchAndShowComments(story) {
+            currentStoryId = story.id;
+            addStoryToRead(story.id);
+            const storyCard = storyContainer.querySelector(`.story-card[data-story-id="${story.id}"]`);
+            if(storyCard) storyCard.classList.add('read');
+
             popupTitle.textContent = story.title;
             const header = popupTitle.parentElement;
             
             popupControls.innerHTML = `
-                <button id="read-aloud-button" class="action-button secondary">Read Aloud</button>
-                <button id="stop-reading-button" class="action-button" style="display:none;">Stop</button>
-                <div class="reading-controls">
-                    <span>Font Size:</span>
-                    <button id="font-size-down" class="icon-button" title="Decrease Font Size">A-</button>
-                    <button id="font-size-up" class="icon-button" title="Increase Font Size">A+</button>
+                <div class="popup-actions-left">
+                    <button id="read-aloud-button" class="action-button secondary">Read Aloud</button>
+                    <button id="stop-reading-button" class="action-button" style="display:none;">Stop</button>
                 </div>
-                <div class="reading-controls">
-                    <span>Line Height:</span>
-                    <button id="line-height-down" class="icon-button" title="Decrease Line Height"> Less</button>
-                    <button id="line-height-up" class="icon-button" title="Increase Line Height">More</button>
+                <div class="popup-actions-right">
+                     <div class="reading-controls">
+                        <span>Font Size:</span>
+                        <button id="font-size-down" class="icon-button" title="Decrease Font Size">A-</button>
+                        <button id="font-size-up" class="icon-button" title="Increase Font Size">A+</button>
+                    </div>
+                    <div class="reading-controls">
+                        <span>Line Height:</span>
+                        <button id="line-height-down" class="icon-button" title="Decrease Line Height"> Less</button>
+                        <button id="line-height-up" class="icon-button" title="Increase Line Height">More</button>
+                    </div>
+                     <div class="comment-sort-controls">
+                        <label for="comment-sort-select">Sort Comments:</label>
+                        <select id="comment-sort-select" class="dropdown-input">
+                            <option value="confidence">Top</option>
+                            <option value="new">New</option>
+                            <option value="controversial">Controversial</option>
+                            <option value="q&a">Q&A</option>
+                        </select>
+                    </div>
                 </div>
             `;
 
-            setupReadingControls();
+            setupReadingControls(story);
+             document.getElementById('comment-sort-select').addEventListener('change', (e) => {
+                fetchCommentsForCurrentStory(e.target.value);
+            });
             
             let headerActions = header.querySelector('.popup-header-actions');
             if (!headerActions) {
@@ -353,7 +381,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
             document.body.style.overflow = 'hidden';
             popupOverlay.classList.add('active');
-            popupBody.innerHTML = `<div class="spinner"></div><p class="loading-message">Loading story...</p>`;
             
             let storyText = story.selftext || '';
             if (currentSearchQuery) {
@@ -369,44 +396,67 @@ document.addEventListener('DOMContentLoaded', () => {
             if (storyText) {
                 finalContent += `<p>${storyText.replace(/\n/g, '<br>')}</p>`;
             }
+            
+            finalContent += `<hr><div id="comment-section" data-op-author="${story.author}"></div>`;
+            popupBody.innerHTML = finalContent;
+            
+            fetchCommentsForCurrentStory('confidence');
+        }
+
+        async function fetchCommentsForCurrentStory(sort) {
+            const story = allFetchedPosts.find(p => p.id === currentStoryId);
+            if (!story) return;
+
+            const commentSection = document.getElementById('comment-section');
+            if (commentSection) {
+                commentSection.innerHTML = `<h4>Comments:</h4><div class="spinner"></div>`;
+            } else {
+                 popupBody.innerHTML += `<hr><div id="comment-section" data-op-author="${story.author}"><h4>Comments:</h4><div class="spinner"></div></div>`;
+            }
 
             try {
-                const commentsUrl = `${REDDIT_API_BASE_URL}${story.subreddit}/comments/${story.id}.json`;
+                const commentsUrl = `${REDDIT_API_BASE_URL}${story.subreddit}/comments/${story.id}.json?sort=${sort}`;
                 const response = await fetch(commentsUrl);
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const data = await response.json();
                 const comments = data[1].data.children;
-
-                finalContent += `<hr><div id="comment-section"><h4>Top Comments:</h4></div>`;
                 
-                popupBody.innerHTML = finalContent;
+                const currentCommentSection = document.getElementById('comment-section');
+                currentCommentSection.innerHTML = `<h4>Comments:</h4>`;
                 appendComments(story.name, comments);
-
             } catch (error) {
-                console.error("Failed to fetch comments:", error);
-                popupBody.innerHTML += `<p>Could not load comments.</p>`;
+                console.error(`Failed to fetch comments sorted by ${sort}:`, error);
+                 const currentCommentSection = document.getElementById('comment-section');
+                currentCommentSection.innerHTML = `<p>Could not load comments.</p>`;
             }
         }
+
 
         function appendComments(postName, commentData) {
             const commentSection = document.getElementById('comment-section');
             if (!commentSection) return;
+            const opAuthor = commentSection.dataset.opAuthor;
 
             const moreCommentsObject = commentData.find(c => c.kind === 'more');
             const actualComments = commentData.filter(c => c.kind === 't1');
 
             if (actualComments.length > 0) {
-                 commentSection.innerHTML += actualComments.map(c => c.data).filter(c => c.body).map(c => {
+                 const commentsHTML = actualComments.map(c => c.data).filter(c => c.body).map(c => {
                     let commentBody = c.body;
                     if (currentSearchQuery) {
                        commentBody = highlightKeywords(commentBody, currentSearchQuery);
                     }
+                    const isOp = c.author === opAuthor;
+                    const opClass = isOp ? 'op-comment' : '';
+                    const opLabel = isOp ? '<span class="op-label">OP</span>' : '';
+
                     return `
-                    <div class="comment-card" data-comment-author="${c.author}">
-                        <p class="comment-author">u/${c.author}</p>
+                    <div class="comment-card ${opClass}" data-comment-author="${c.author}">
+                        <p class="comment-author"><span class="collapse-comment">[–]</span>u/${c.author} ${opLabel}</p>
                         <p class="comment-body">${commentBody.replace(/\n/g, '<br>')}</p>
                     </div>`
                 }).join('');
+                commentSection.insertAdjacentHTML('beforeend', commentsHTML);
             }
 
             const loadMoreContainer = document.querySelector('.load-more-comments-container');
@@ -431,9 +481,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         async function fetchMoreComments(postName, childrenIds, buttonContainer) {
             try {
-                const ids = childrenIds.slice(0, 100).join(','); // Reddit API limit
-                const remainingIds = childrenIds.slice(100);
-
+                const ids = childrenIds.slice(0, 100).join(',');
                 const url = `https://api.reddit.com/api/morechildren.json?api_type=json&link_id=${postName}&children=${ids}`;
                 const response = await fetch(url);
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -449,41 +497,43 @@ document.addEventListener('DOMContentLoaded', () => {
                 buttonContainer.innerHTML = `<p>Failed to load more comments.</p>`;
             }
         }
-
-        function renderStories(posts) {
-            storyContainer.innerHTML = '';
+        
+        function renderFilteredStories() {
             const flairFilter = flairFilterInput.value.trim().toLowerCase();
-            const filteredPosts = flairFilter 
-                ? posts.filter(story => story.link_flair_text && story.link_flair_text.toLowerCase().includes(flairFilter))
-                : posts;
+            const readStories = getReadStories();
 
-            const isImageHeavy = filteredPosts.filter(p => p.post_hint === 'image').length / filteredPosts.length > 0.5;
-            galleryToggleButton.style.display = isImageHeavy ? 'flex' : 'none';
+            storyContainer.querySelectorAll('.story-card').forEach(card => {
+                const storyId = card.dataset.storyId;
+                const story = allFetchedPosts.find(p => p.id === storyId);
+                
+                const flairMatch = !flairFilter || (story.link_flair_text && story.link_flair_text.toLowerCase().includes(flairFilter));
+                card.style.display = flairMatch ? 'flex' : 'none';
+
+                if (readStories.includes(storyId)) {
+                    card.classList.add('read');
+                } else {
+                    card.classList.remove('read');
+                }
+            });
             
-            if (isImageHeavy) {
-                const isGallery = localStorage.getItem(GALLERY_PREFERENCE_KEY) === 'true';
-                applyGalleryPreference(isGallery);
-            } else {
-                applyGalleryPreference(false);
-            }
-
-
-            if (filteredPosts.length > 0) {
-                displayStories(filteredPosts);
-            } else {
-                storyContainer.innerHTML = `<p class="empty-state">No stories found with the current filters.</p>`;
-            }
-
-            const hasAnyFlair = posts.some(p => p.link_flair_text);
-            filterSection.style.display = !isShowingSaved && hasAnyFlair ? 'flex' : 'none';
+            const isImageHeavy = allFetchedPosts.filter(p => p.post_hint === 'image').length / allFetchedPosts.length > 0.5;
+            galleryToggleButton.style.display = isImageHeavy ? 'flex' : 'none';
         }
+
 
         function displayStories(stories) {
             const shouldBlur = nsfwToggle.checked;
+            const readStories = getReadStories();
 
             stories.forEach((story, index) => {
                 const storyCard = document.createElement('div');
                 storyCard.className = 'story-card';
+                storyCard.dataset.storyId = story.id;
+                
+                if (readStories.includes(story.id)) {
+                    storyCard.classList.add('read');
+                }
+
                 if (story.distinguished === 'moderator') {
                     storyCard.classList.add('moderator-post');
                 }
@@ -491,6 +541,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const isSaved = isStorySaved(story.id);
                 const redditLink = `https://www.reddit.com${story.permalink}`;
                 const readingTime = calculateReadingTime(story.selftext);
+                const timeAgo = formatTimeAgo(story.created_utc);
                 const isSensitive = story.over_18 || story.spoiler;
 
                 if (shouldBlur && isSensitive) {
@@ -521,6 +572,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div class="story-meta">
                             <span><svg viewBox="0 0 24 24"><path d="M12 2L2 12h5v10h10V12h5L12 2z"/></svg>${story.score.toLocaleString()}</span>
                             <span><svg viewBox="0 0 24 24"><path d="M21.99 4c0-1.1-.89-2-1.99-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14l4 4-.01-18z"/></svg>${story.num_comments.toLocaleString()}</span>
+                            <span><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>${timeAgo}</span>
                             ${story.link_flair_text ? `<span class="story-flair">${story.link_flair_text}</span>` : ''}
                         </div>
                         <h3><a href="${redditLink}" target="_blank" rel="noopener noreferrer">${story.title}</a></h3>
@@ -601,56 +653,69 @@ document.addEventListener('DOMContentLoaded', () => {
             const time = Math.ceil(words / wordsPerMinute);
             return `${time} min read`;
         }
+
+        function formatTimeAgo(utcTimestamp) {
+            const now = new Date();
+            const postDate = new Date(utcTimestamp * 1000);
+            const seconds = Math.floor((now - postDate) / 1000);
+
+            let interval = seconds / 31536000;
+            if (interval > 1) {
+                const years = Math.floor(interval);
+                return `${years} year${years > 1 ? 's' : ''} ago`;
+            }
+            interval = seconds / 2592000;
+            if (interval > 1) {
+                const months = Math.floor(interval);
+                return `${months} month${months > 1 ? 's' : ''} ago`;
+            }
+            interval = seconds / 86400;
+            if (interval > 1) {
+                const days = Math.floor(interval);
+                return `${days} day${days > 1 ? 's' : ''} ago`;
+            }
+            interval = seconds / 3600;
+            if (interval > 1) {
+                const hours = Math.floor(interval);
+                return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+            }
+            interval = seconds / 60;
+            if (interval > 1) {
+                const minutes = Math.floor(interval);
+                return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
+            }
+            return `${Math.floor(seconds)} second${seconds !== 1 ? 's' : ''} ago`;
+        }
         
         function highlightKeywords(text, query) {
             const keywords = query.split(' ').filter(Boolean);
             const regex = new RegExp(`(${keywords.join('|')})`, 'gi');
             return text.replace(regex, `<span class="highlight">$1</span>`);
         }
-
-        function handleReadAloud(story) {
-            const readAloudButton = document.getElementById('read-aloud-button');
-            const stopReadingButton = document.getElementById('stop-reading-button');
-            
-            window.speechSynthesis.cancel();
-
-            let textToRead = `Title: ${story.title}. By user ${story.author}. ${story.selftext}. `;
-            const comments = popupBody.querySelectorAll('.comment-card');
-            if (comments.length > 0) {
-                textToRead += " Now for the top comments. ";
-                comments.forEach(comment => {
-                    const author = comment.dataset.commentAuthor;
-                    const body = comment.querySelector('.comment-body').textContent;
-                    textToRead += `Comment from user ${author}. ${body}. `;
-                });
-            }
-
-            const utterance = new SpeechSynthesisUtterance(textToRead);
-            utterance.onstart = () => {
-                readAloudButton.style.display = 'none';
-                stopReadingButton.style.display = 'inline-block';
-            };
-            utterance.onend = () => {
-                readAloudButton.style.display = 'inline-block';
-                stopReadingButton.style.display = 'none';
-            };
-            utterance.onerror = (event) => {
-                console.error('Speech synthesis error:', event.error);
-                showToast('Sorry, text-to-speech is not available.');
-                readAloudButton.style.display = 'inline-block';
-                stopReadingButton.style.display = 'none';
-            };
-
-            window.speechSynthesis.speak(utterance);
-        }
-
+        
         function handleAuthorClick(author) {
             searchInput.value = `author:${author}`;
             handleFetchClick();
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
         
-        // --- Saved Stories & History Functions ---
+        // --- Saved & Read Stories, History Functions ---
+        function getReadStories() {
+            return JSON.parse(localStorage.getItem(READ_STORIES_KEY)) || [];
+        }
+
+        function addStoryToRead(storyId) {
+            let readStories = getReadStories();
+            if (!readStories.includes(storyId)) {
+                readStories.push(storyId);
+                localStorage.setItem(READ_STORIES_KEY, JSON.stringify(readStories));
+            }
+        }
+
+        function isStoryRead(storyId) {
+            return getReadStories().includes(storyId);
+        }
+
         function toggleSaveStory(event, story) {
             const button = event.target;
             const savedStories = getSavedStories();
@@ -680,7 +745,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         function displaySavedStories() {
             storyContainer.innerHTML = '';
-            loadMoreButton.style.display = 'none';
             
             let savedStories = getSavedStories();
             const sortMethod = savedSortSelect.value;
@@ -704,7 +768,7 @@ document.addEventListener('DOMContentLoaded', () => {
             storiesHeading.textContent = `You have ${allFetchedPosts.length} saved stor${allFetchedPosts.length === 1 ? 'y' : 'ies'}`;
             
             if (allFetchedPosts.length > 0) {
-                clearSavedContainer.style.display = 'block';
+                clearSavedContainer.style.display = 'flex';
                 displayStories(allFetchedPosts);
             } else {
                 clearSavedContainer.style.display = 'none';
@@ -808,7 +872,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.documentElement.style.setProperty('--popup-line-height', settings.lineHeight);
         }
         
-        function setupReadingControls() {
+        function setupReadingControls(story) {
             const readAloudButton = document.getElementById('read-aloud-button');
             const stopReadingButton = document.getElementById('stop-reading-button');
             const fontSizeUp = document.getElementById('font-size-up');
@@ -816,7 +880,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const lineHeightUp = document.getElementById('line-height-up');
             const lineHeightDown = document.getElementById('line-height-down');
             
-            readAloudButton.addEventListener('click', handleReadAloud);
+            readAloudButton.addEventListener('click', () => handleReadAloud(story));
             stopReadingButton.addEventListener('click', () => {
                 window.speechSynthesis.cancel();
                 readAloudButton.style.display = 'inline-block';
@@ -827,6 +891,38 @@ document.addEventListener('DOMContentLoaded', () => {
             fontSizeDown.addEventListener('click', () => updateReadingSetting('fontSize', -0.1));
             lineHeightUp.addEventListener('click', () => updateReadingSetting('lineHeight', 0.1));
             lineHeightDown.addEventListener('click', () => updateReadingSetting('lineHeight', -0.1));
+        }
+
+        function handleReadAloud(story) {
+            const readAloudButton = document.getElementById('read-aloud-button');
+            const stopReadingButton = document.getElementById('stop-reading-button');
+            window.speechSynthesis.cancel();
+            let textToRead = `Title: ${story.title}. By user ${story.author}. ${story.selftext}. `;
+            const comments = popupBody.querySelectorAll('.comment-card');
+            if (comments.length > 0) {
+                textToRead += " Now for the top comments. ";
+                comments.forEach(comment => {
+                    const author = comment.dataset.commentAuthor;
+                    const body = comment.querySelector('.comment-body').textContent;
+                    textToRead += `Comment from user ${author}. ${body}. `;
+                });
+            }
+            const utterance = new SpeechSynthesisUtterance(textToRead);
+            utterance.onstart = () => {
+                readAloudButton.style.display = 'none';
+                stopReadingButton.style.display = 'inline-block';
+            };
+            utterance.onend = () => {
+                readAloudButton.style.display = 'inline-block';
+                stopReadingButton.style.display = 'none';
+            };
+            utterance.onerror = (event) => {
+                console.error('Speech synthesis error:', event.error);
+                showToast('Sorry, text-to-speech is not available.');
+                readAloudButton.style.display = 'inline-block';
+                stopReadingButton.style.display = 'none';
+            };
+            window.speechSynthesis.speak(utterance);
         }
 
         function updateReadingSetting(setting, change) {
@@ -887,6 +983,15 @@ document.addEventListener('DOMContentLoaded', () => {
             if (card) {
                 card.classList.add('active-card');
                 card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+        
+        function handlePopupBodyClick(e) {
+            const collapseButton = e.target.closest('.collapse-comment');
+            if (collapseButton) {
+                const commentCard = collapseButton.closest('.comment-card');
+                const isCollapsed = commentCard.classList.toggle('collapsed');
+                collapseButton.textContent = isCollapsed ? '[+]' : '[–]';
             }
         }
 
