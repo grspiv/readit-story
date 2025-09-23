@@ -43,7 +43,7 @@
         <section id="controls-container" class="controls-container">
             <div class="controls">
                 <div class="input-group main-input">
-                    <label for="subreddit-input">Subreddit:</label>
+                    <label for="subreddit-input">Subreddit (use + for multi):</label>
                     <input type="text" id="subreddit-input" list="subreddit-list" value="AskReddit" class="text-input">
                     <datalist id="subreddit-list"></datalist>
                 </div>
@@ -105,6 +105,9 @@
                     <option value="score-desc">Score</option>
                     <option value="subreddit-az">Subreddit (A-Z)</option>
                 </select>
+                <div class="input-group search-container">
+                    <input type="text" id="saved-search-input" class="text-input" placeholder="Search saved stories...">
+                </div>
             </div>
              <div id="history-sort-section" class="input-group" style="display: none;">
                 <label for="history-sort-select">Sort History by:</label>
@@ -114,6 +117,9 @@
                     <option value="score-desc">Score</option>
                     <option value="subreddit-az">Subreddit (A-Z)</option>
                 </select>
+                <div class="input-group search-container">
+                    <input type="text" id="history-search-input" class="text-input" placeholder="Search history...">
+                </div>
             </div>
              <div id="clear-saved-container" style="display: none;">
                 <div>
@@ -161,6 +167,7 @@
                     </svg>
                 </button>
             </div>
+            <div id="jump-to-nav" class="jump-to-nav"></div>
             <div class="popup-controls"></div>
             <div id="series-navigation" class="series-navigation"></div>
             <div id="popup-body" class="popup-body"></div>

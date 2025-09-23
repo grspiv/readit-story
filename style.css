@@ -179,7 +179,15 @@ body {
 }
 
 #saved-sort-section,
-#history-sort-section,
+#history-sort-section {
+    align-items: flex-start;
+}
+
+#saved-sort-section .text-input,
+#history-sort-section .text-input {
+    margin-top: 8px;
+}
+
 #clear-saved-container,
 #clear-history-container {
     flex-grow: 0;
@@ -784,9 +792,32 @@ body {
     flex-wrap: wrap;
     justify-content: space-between;
     align-items: center;
-    border-bottom: 1px solid var(--border-color);
     margin-bottom: 10px;
 }
+
+.jump-to-nav {
+    display: flex;
+    gap: 10px;
+    width: 100%;
+    justify-content: center;
+    padding: 10px 20px 15px 20px;
+    border-bottom: 1px solid var(--border-color);
+}
+.jump-to-nav button {
+    background: none;
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    padding: 5px 12px;
+    border-radius: 15px;
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: all 0.2s ease;
+}
+.jump-to-nav button:hover {
+    background-color: var(--border-color);
+    color: var(--heading-color);
+}
+
 .popup-actions-left, .popup-actions-right {
     display: flex;
     gap: 15px;
@@ -862,6 +893,10 @@ body {
     display: flex;
     align-items: center;
     gap: 8px;
+}
+.comment-author a {
+    color: var(--highlight-color);
+    text-decoration: none;
 }
 .op-label {
     background-color: var(--op-color);
@@ -1166,16 +1201,55 @@ input:checked + .slider:before { transform: translateX(26px); }
         padding: 10px;
     }
 
-    .controls, .action-bar, .advanced-filters {
+    /* Make main controls horizontal and compact */
+    .controls {
+        flex-direction: row;
+        flex-wrap: nowrap;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .controls .input-group label {
+        display: none;
+    }
+
+    .controls .input-group {
+        min-width: 0;
+    }
+
+    .controls .text-input {
+        padding: 10px 15px;
+        font-size: 14px;
+    }
+
+    .controls #fetch-button {
+        flex-grow: 0;
+        padding: 10px 15px;
+        min-width: auto;
+    }
+    
+    .action-bar, .advanced-filters {
         flex-direction: column;
         align-items: stretch;
     }
+
+    .action-bar {
+        margin-top: 30px; /* Increased spacing */
+    }
+    
+    #saved-sort-section, #history-sort-section {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
 
     #toggle-filters-button {
         display: flex;
         justify-content: center;
         align-items: center;
-        width: 100%;
+        width: auto; /* Let it size to content */
+        flex-grow: 0;
+        padding: 10px;
     }
 
     .advanced-filters {

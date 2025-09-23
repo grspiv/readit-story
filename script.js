@@ -55,6 +55,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const closeUserProfilePopup = document.getElementById('close-user-profile-popup');
         const toggleFiltersButton = document.getElementById('toggle-filters-button');
         const advancedFilters = document.getElementById('advanced-filters');
+        const savedSearchInput = document.getElementById('saved-search-input');
+        const historySearchInput = document.getElementById('history-search-input');
+        const jumpToNav = document.getElementById('jump-to-nav');
 
 
         // --- Constants & State ---
@@ -110,6 +113,8 @@ document.addEventListener('DOMContentLoaded', () => {
         importFileInput.addEventListener('change', handleImportFile);
         savedSortSelect.addEventListener('change', displaySavedStories);
         historySortSelect.addEventListener('change', displayHistory);
+        savedSearchInput.addEventListener('input', displaySavedStories);
+        historySearchInput.addEventListener('input', displayHistory);
         flairFilterInput.addEventListener('input', () => renderFilteredStories());
         minScoreInput.addEventListener('input', () => renderFilteredStories());
         minCommentsInput.addEventListener('input', () => renderFilteredStories());
@@ -370,14 +375,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (!loadMore) {
                 scrollToTop();
-                if (!subreddit.includes('+') && !query.toLowerCase().startsWith('author:')) saveSubredditToHistory(subreddit);
+                const isMultiReddit = subreddit.includes('+');
+                if (!isMultiReddit && !query.toLowerCase().startsWith('author:')) {
+                    saveSubredditToHistory(subreddit);
+                }
+
                 allFetchedPosts = [];
                 currentAfterToken = null;
                 flairFilterInput.value = '';
                 minScoreInput.value = '';
                 minCommentsInput.value = '';
                 storyContainer.innerHTML = '';
-                 if (!subreddit.includes('+') && !query) {
+
+                if (!isMultiReddit && !query) {
                     fetchSubredditInfo(subreddit);
                 } else {
                     subredditInfoPanel.style.display = 'none';
@@ -438,6 +448,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
             popupTitle.textContent = story.title;
             const header = popupTitle.parentElement.parentElement;
+            
+            jumpToNav.innerHTML = `
+                <button id="jump-to-story">Jump to Story</button>
+                <button id="jump-to-comments">Jump to Comments</button>
+            `;
+            document.getElementById('jump-to-story').addEventListener('click', () => {
+                const storyContent = popupBody.querySelector('#story-content-wrapper');
+                if (storyContent) storyContent.scrollIntoView({ behavior: 'smooth' });
+            });
+            document.getElementById('jump-to-comments').addEventListener('click', () => {
+                const commentSection = popupBody.querySelector('#comment-section');
+                if (commentSection) commentSection.scrollIntoView({ behavior: 'smooth' });
+            });
             
             popupControls.innerHTML = `
                 <div class="popup-actions-left">
@@ -522,7 +545,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 storyText = highlightKeywords(storyText, currentSearchQuery);
             }
 
-            let finalContent = createMediaElement(story, true);
+            let finalContent = `<div id="story-content-wrapper">`;
+            finalContent += createMediaElement(story, true);
 
             if (story.crosspost_parent_list && story.crosspost_parent_list.length > 0) {
                  finalContent += `<div class="crosspost-info">Cross-posted from <a href="#" onclick="event.preventDefault(); window.open('https://reddit.com/r/${story.crosspost_parent_list[0].subreddit}', '_blank')">r/${story.crosspost_parent_list[0].subreddit}</a></div>`;
@@ -531,6 +555,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (storyText) {
                 finalContent += `<div class="markdown-content">${renderMarkdown(storyText)}</div>`;
             }
+            finalContent += `</div>`;
             
             finalContent += `<hr><div id="comment-section" data-op-author="${story.author}"></div>`;
             popupBody.innerHTML = finalContent;
@@ -890,6 +915,16 @@ document.addEventListener('DOMContentLoaded', () => {
             storyContainer.innerHTML = '';
             
             let history = getHistory();
+            const searchTerm = historySearchInput.value.trim().toLowerCase();
+            
+            if (searchTerm) {
+                history = history.filter(story => 
+                    story.title.toLowerCase().includes(searchTerm) || 
+                    (story.selftext && story.selftext.toLowerCase().includes(searchTerm)) || 
+                    story.subreddit.toLowerCase().includes(searchTerm)
+                );
+            }
+
             const sortMethod = historySortSelect.value;
             
             switch (sortMethod) {
@@ -907,11 +942,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     break;
             }
 
-            storiesHeading.textContent = `You have read ${history.length} stor${history.length === 1 ? 'y' : 'ies'}`;
+            storiesHeading.textContent = `Showing ${history.length} stor${history.length === 1 ? 'y' : 'ies'} from your history`;
             
-            if (history.length > 0) {
+            if (getHistory().length > 0) {
                 clearHistoryContainer.style.display = 'flex';
                 displayStories(history, { isHistoryView: true });
+                if (history.length === 0) {
+                    storyContainer.innerHTML = `<p class="empty-state">No stories in your history match your search.</p>`;
+                }
             } else {
                 clearHistoryContainer.style.display = 'none';
                 storyContainer.innerHTML = `<p class="empty-state">You haven't read any stories yet.</p>`;
@@ -964,6 +1002,16 @@ document.addEventListener('DOMContentLoaded', () => {
             storyContainer.innerHTML = '';
             
             let savedStories = getSavedStories();
+            const searchTerm = savedSearchInput.value.trim().toLowerCase();
+
+            if (searchTerm) {
+                savedStories = savedStories.filter(story => 
+                    story.title.toLowerCase().includes(searchTerm) || 
+                    (story.selftext && story.selftext.toLowerCase().includes(searchTerm)) || 
+                    story.subreddit.toLowerCase().includes(searchTerm)
+                );
+            }
+
             const sortMethod = savedSortSelect.value;
             
             switch (sortMethod) {
@@ -981,11 +1029,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     break;
             }
 
-            storiesHeading.textContent = `You have ${savedStories.length} saved stor${savedStories.length === 1 ? 'y' : 'ies'}`;
+            storiesHeading.textContent = `Showing ${savedStories.length} saved stor${savedStories.length === 1 ? 'y' : 'ies'}`;
             
-            if (savedStories.length > 0) {
+            if (getSavedStories().length > 0) {
                 clearSavedContainer.style.display = 'flex';
                 displayStories(savedStories);
+                 if (savedStories.length === 0) {
+                    storyContainer.innerHTML = `<p class="empty-state">No saved stories match your search.</p>`;
+                }
             } else {
                 clearSavedContainer.style.display = 'none';
                 storyContainer.innerHTML = `<p class="empty-state">You haven't saved any stories yet.</p>`;
