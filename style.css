@@ -51,9 +51,8 @@ body {
     transition: background-color 0.3s ease, color 0.3s ease;
     -webkit-transition: background-color 0.3s ease, color 0.3s ease;
     -webkit-tap-highlight-color: transparent; /* Disable tap highlight on iOS */
-    -webkit-text-size-adjust: 100%; /* Prevent font scaling on orientation change */
+    -webkit-text-size-adjust: none; /* Prevent font scaling on orientation change */
     -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
 }
 
 @keyframes background-move {
@@ -363,7 +362,6 @@ body {
     display: -webkit-box;
     -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
-    line-clamp: 3;
     flex-grow: 1;
 }
 
@@ -440,7 +438,6 @@ body {
 }
 .story-container.list-view .preview {
     -webkit-line-clamp: 2;
-    line-clamp: 2;
 }
 
 
@@ -548,7 +545,6 @@ body {
     border-radius: 16px;
     width: 100%;
     max-width: 800px;
-    height: -webkit-fill-available;
     max-height: 90vh; /* Fallback for older browsers */
     max-height: 90svh; /* More reliable unit for mobile */
     overflow-y: auto;
