@@ -75,7 +75,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
         // --- Constants & State ---
-        const REDDIT_API_BASE_URL = 'https://www.reddit.com/';
+        const REDDIT_API_BASE_URL = 'https://api.reddit.com/';
         const SAVED_STORIES_KEY = 'redditStorytellerSaved';
         const READ_HISTORY_KEY = 'redditStorytellerHistory';
         const SUBREDDIT_HISTORY_KEY = 'redditSubredditHistory';
@@ -642,7 +642,7 @@ document.addEventListener('DOMContentLoaded', () => {
             finalContent += createMediaElement(story, true);
 
             if (story.crosspost_parent_list && story.crosspost_parent_list.length > 0) {
-                 finalContent += `<div class="crosspost-info">Cross-posted from <a href="#" onclick="event.preventDefault(); window.open('https://reddit.com/r/${story.crosspost_parent_list[0].subreddit}', '_blank')">r/${story.crosspost_parent_list[0].subreddit}</a></div>`;
+                 finalContent += `<div class="crosspost-info">Cross-posted from <a href="#" onclick="event.preventDefault(); window.open('https://www.reddit.com/r/${story.crosspost_parent_list[0].subreddit}', '_blank')">r/${story.crosspost_parent_list[0].subreddit}</a></div>`;
             }
 
             if (storyText) {
@@ -2066,5 +2066,4 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.innerHTML = "<h1>A critical error occurred. Please refresh the page.</h1>";
     }
 });
-
 
