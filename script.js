@@ -61,6 +61,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const collapseCommentsToggle = document.getElementById('collapse-comments-toggle');
         const savedStoryNotesContainer = document.getElementById('saved-story-notes-container');
         const savedStoryNotes = document.getElementById('saved-story-notes');
+        const markAllReadButton = document.getElementById('mark-all-read-button');
+        const commentNavigator = document.getElementById('comment-navigator');
 
 
         // --- Constants & State ---
@@ -84,6 +86,8 @@ document.addEventListener('DOMContentLoaded', () => {
         let currentStoryId = null;
         let currentUtterance = null;
         let currentSeries = { parts: [], currentIndex: -1 };
+        let topLevelComments = [];
+        let currentCommentIndex = -1;
 
         // --- Initialization ---
         const savedTheme = localStorage.getItem('theme') || 'light';
@@ -149,6 +153,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         collapseCommentsToggle.addEventListener('change', () => applyCollapseCommentsPreference(collapseCommentsToggle.checked, true));
         savedStoryNotes.addEventListener('input', debounce(saveStoryNote, 500));
+        markAllReadButton.addEventListener('click', handleMarkAllRead);
 
         // --- Main View Controller ---
         function switchToView(view, options = {}) {
@@ -161,11 +166,12 @@ document.addEventListener('DOMContentLoaded', () => {
             window.scrollTo({ top: 0, behavior: 'smooth' });
 
             // Hide all view-specific sections
-            [controlsContainer, savedSortSection, clearSavedContainer, historySortSection, clearHistoryContainer, subredditInfoPanel].forEach(el => el.style.display = 'none');
+            [controlsContainer, savedSortSection, clearSavedContainer, historySortSection, clearHistoryContainer, subredditInfoPanel, markAllReadButton].forEach(el => el.style.display = 'none');
             [viewSavedButton, viewHistoryButton].forEach(btn => btn.classList.remove('active'));
 
             if (view === 'browsing') {
                 controlsContainer.style.display = 'block';
+                markAllReadButton.style.display = 'flex';
                 viewSavedButton.textContent = 'Saved Stories';
                 viewHistoryButton.textContent = 'History';
                 if (options.refresh) {
@@ -624,6 +630,9 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                  popupBody.innerHTML += `<hr><div id="comment-section" data-op-author="${story.author}"><h4>Comments:</h4><div class="spinner"></div></div>`;
             }
+            
+            commentNavigator.style.display = 'none';
+            topLevelComments = [];
 
             try {
                 const commentsUrl = `${REDDIT_API_BASE_URL}r/${story.subreddit}/comments/${story.id}.json?sort=${sort}`;
@@ -641,6 +650,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 const currentCommentSection = document.getElementById('comment-section');
                 currentCommentSection.innerHTML = `<h4>Comments:</h4>`;
                 appendComments(story.name, comments);
+                
+                topLevelComments = [...currentCommentSection.querySelectorAll(':scope > .comment-card')];
+                setupCommentNavigator();
+
             } catch (error) {
                 console.error(`Failed to fetch comments sorted by ${sort}:`, error);
                  const currentCommentSection = document.getElementById('comment-section');
@@ -725,6 +738,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const minComments = parseInt(minCommentsInput.value, 10) || 0;
             const readStories = getHistory().map(h => h.id);
 
+            let visibleCount = 0;
             storyContainer.querySelectorAll('.story-card').forEach(card => {
                 const storyId = card.dataset.storyId;
                 const story = allFetchedPosts.find(p => p.id === storyId);
@@ -735,7 +749,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 const scoreMatch = story.score >= minScore;
                 const commentsMatch = story.num_comments >= minComments;
                 
-                card.style.display = (flairMatch && scoreMatch && commentsMatch) ? 'flex' : 'none';
+                if (flairMatch && scoreMatch && commentsMatch) {
+                    card.style.display = 'flex';
+                    visibleCount++;
+                } else {
+                    card.style.display = 'none';
+                }
 
                 if (readStories.includes(storyId)) {
                     card.classList.add('read');
@@ -743,6 +762,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     card.classList.remove('read');
                 }
             });
+            
+            markAllReadButton.style.display = visibleCount > 0 && currentView === 'browsing' ? 'flex' : 'none';
             
             const isImageHeavy = allFetchedPosts.length > 0 && allFetchedPosts.filter(p => p.post_hint === 'image').length / allFetchedPosts.length > 0.5;
             galleryToggleButton.style.display = isImageHeavy ? 'flex' : 'none';
@@ -801,6 +822,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (story.crosspost_parent_list && story.crosspost_parent_list.length > 0) {
                     crosspostHTML = `<div class="crosspost-info">Cross-posted from <a href="#" data-subreddit="${story.crosspost_parent_list[0].subreddit}">r/${story.crosspost_parent_list[0].subreddit}</a></div>`;
                 }
+                
+                const galleryOverlayHTML = `
+                    <div class="gallery-card-overlay">
+                        <h4>${story.title}</h4>
+                        <p>${(story.score || 0).toLocaleString()} upvotes</p>
+                    </div>`;
 
                 storyCard.innerHTML += `
                     ${createMediaElement(story, false)}
@@ -830,7 +857,8 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <button class="save-button ${isSaved ? 'saved' : ''}">${isSaved ? 'Saved' : 'Save'}</button>
                             </div>
                         </div>
-                    </div>`;
+                    </div>
+                    ${galleryOverlayHTML}`;
                 
                 storyCard.addEventListener('click', (e) => {
                     if (e.target.closest('button, a, .author, .crosspost-info a')) {
@@ -941,7 +969,11 @@ document.addEventListener('DOMContentLoaded', () => {
         
         function renderMarkdown(text) {
             if (!text) return '';
-            return marked.parse(text, { breaks: true });
+            // Decode HTML entities that Reddit sometimes uses in markdown text
+            const tempTextArea = document.createElement('textarea');
+            tempTextArea.innerHTML = text;
+            const decodedText = tempTextArea.value;
+            return marked.parse(decodedText, { breaks: true });
         }
 
         // --- Saved & History Functions ---
@@ -1240,6 +1272,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 showErrorPopup('Could not prepare the story for download.');
             }
         }
+
+        function handleMarkAllRead() {
+            const visibleCards = [...storyContainer.querySelectorAll('.story-card')].filter(card => card.style.display !== 'none');
+            if (visibleCards.length === 0) {
+                showToast("No stories to mark as read.");
+                return;
+            }
+
+            visibleCards.forEach(card => {
+                const storyId = card.dataset.storyId;
+                const story = allFetchedPosts.find(p => p.id === storyId);
+                if (story && !isStoryRead(storyId)) {
+                    addStoryToHistory(story);
+                    card.classList.add('read');
+                }
+            });
+            showToast(`Marked ${visibleCards.length} stories as read.`);
+        }
         
         // --- Reading Controls & Keyboard Nav ---
         function getReadingSettings() {
@@ -1347,6 +1397,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             currentIndex++;
                             setActiveCard(cards[currentIndex]);
                         }
+                    } else if (isPopupActive) {
+                        // Navigate comments with j/k in popup
                     }
                     break;
                 case 'k':
@@ -1485,6 +1537,56 @@ document.addEventListener('DOMContentLoaded', () => {
 
             seriesNavigation.appendChild(prevButton);
             seriesNavigation.appendChild(nextButton);
+        }
+
+        // --- Comment Navigator Functions ---
+        function setupCommentNavigator() {
+            if (topLevelComments.length < 5) { // Only show for 5+ comments
+                commentNavigator.style.display = 'none';
+                return;
+            }
+            commentNavigator.style.display = 'flex';
+            currentCommentIndex = -1;
+            commentNavigator.innerHTML = `
+                <button id="comment-prev" title="Previous Comment (k)">▲</button>
+                <span id="comment-nav-counter">0 / ${topLevelComments.length}</span>
+                <button id="comment-next" title="Next Comment (j)">▼</button>
+            `;
+            
+            document.getElementById('comment-prev').addEventListener('click', () => navigateComments(-1));
+            document.getElementById('comment-next').addEventListener('click', () => navigateComments(1));
+            updateCommentNavigator();
+        }
+
+        function navigateComments(direction) {
+            if (topLevelComments.length === 0) return;
+
+            // Remove highlight from previous comment
+            if (currentCommentIndex > -1) {
+                topLevelComments[currentCommentIndex].classList.remove('active-comment');
+            }
+            
+            currentCommentIndex += direction;
+
+            if (currentCommentIndex >= topLevelComments.length) {
+                currentCommentIndex = 0;
+            }
+            if (currentCommentIndex < 0) {
+                currentCommentIndex = topLevelComments.length -1;
+            }
+
+            const nextComment = topLevelComments[currentCommentIndex];
+            nextComment.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            nextComment.classList.add('active-comment');
+            
+            updateCommentNavigator();
+        }
+
+        function updateCommentNavigator() {
+            const counter = document.getElementById('comment-nav-counter');
+            if (counter) {
+                counter.textContent = `${currentCommentIndex + 1} / ${topLevelComments.length}`;
+            }
         }
         
         // --- User Profile Functions ---
