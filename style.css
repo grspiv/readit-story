@@ -72,9 +72,11 @@ body {
 
 .app-header h1 {
     margin: 0;
-    font-size: 2.5em;
+    font-size: clamp(1.8rem, 5vw, 2.5rem);
     letter-spacing: 2px;
     text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+    flex-basis: 100%;
+    text-align: center;
 }
 
 .header-controls, .layout-controls {
@@ -82,6 +84,8 @@ body {
     align-items: center;
     gap: 20px;
     flex-wrap: wrap;
+    width: 100%;
+    justify-content: center;
 }
 
 .theme-switcher, .filter-switch {
@@ -111,6 +115,7 @@ body {
 
 .action-bar {
     display: flex;
+    flex-wrap: wrap;
     justify-content: center;
     gap: 15px;
     margin-bottom: 30px;
@@ -119,6 +124,8 @@ body {
 .input-group {
     display: flex;
     flex-direction: column;
+    flex-grow: 1;
+    min-width: 200px;
 }
 
 .input-group label {
@@ -143,7 +150,7 @@ body {
     transition: all 0.3s ease;
     width: 100%;
     box-sizing: border-box;
-    -webkit-appearance: none; /* Remove default iOS styling */
+    -webkit-appearance: none;
     appearance: none;
 }
 
@@ -167,8 +174,9 @@ body {
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
     min-width: 150px;
     text-align: center;
-    -webkit-appearance: none; /* Remove default iOS styling */
+    -webkit-appearance: none;
     appearance: none;
+    flex-grow: 1;
 }
 
 .action-button:hover {
@@ -206,11 +214,12 @@ body {
     text-align: center;
     color: var(--heading-color);
     margin-bottom: 20px;
+    font-size: clamp(1.2rem, 4vw, 1.5rem);
 }
 
 .story-container {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 25px;
     transition: grid-template-columns 0.4s ease;
 }
@@ -241,7 +250,7 @@ body {
 
 .story-card-media {
     width: 100%;
-    max-height: 200px;
+    height: 200px; /* Use a fixed height for consistency in grid view */
     overflow: hidden;
 }
 
@@ -252,7 +261,7 @@ body {
 }
 
 .story-card-content {
-    padding: 25px;
+    padding: 20px;
     display: flex;
     flex-direction: column;
     flex-grow: 1;
@@ -288,7 +297,7 @@ body {
 }
 
 .story-card h3 {
-    font-size: 1.4em;
+    font-size: 1.3em;
     color: var(--heading-color);
     margin: 0 0 5px;
 }
@@ -397,10 +406,11 @@ body {
 }
 .story-container.list-view .story-card {
     flex-direction: row;
+    align-items: center;
 }
 .story-container.list-view .story-card-media {
-    width: 150px;
-    height: 100px;
+    width: 120px;
+    height: 80px;
     max-height: none;
     flex-shrink: 0;
 }
@@ -495,6 +505,8 @@ body {
     opacity: 0;
     visibility: hidden;
     transition: opacity 0.4s ease, visibility 0.4s ease;
+    padding: 10px;
+    box-sizing: border-box;
 }
 
 .popup-overlay.active {
@@ -504,11 +516,12 @@ body {
 
 .popup-content {
     background-color: var(--card-bg);
-    padding: 30px;
+    padding: 20px;
     border-radius: 16px;
-    width: 95%;
+    width: 100%;
     max-width: 800px;
-    max-height: 85vh;
+    height: 100%;
+    max-height: 90vh;
     overflow-y: auto;
     box-shadow: 0 15px 30px rgba(0, 0, 0, 0.3);
     transform: scale(0.9);
@@ -527,12 +540,12 @@ body {
     justify-content: space-between;
     align-items: center;
     border-bottom: 2px solid var(--border-color);
-    padding-bottom: 20px;
+    padding-bottom: 15px;
     margin-bottom: 10px;
 }
 
 .popup-title {
-    font-size: 1.8em;
+    font-size: 1.5em;
     color: var(--heading-color);
     margin: 0;
     padding-right: 15px;
@@ -564,6 +577,7 @@ body {
     padding: 10px 0;
     display: flex;
     gap: 10px;
+    flex-wrap: wrap;
 }
 
 .popup-body {
@@ -600,7 +614,7 @@ body {
 
 .comment-card {
     background-color: var(--bg-color);
-    padding: 18px;
+    padding: 15px;
     border-radius: 12px;
     margin-bottom: 15px;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
@@ -698,6 +712,10 @@ body {
     opacity: 0;
     visibility: hidden;
     transition: opacity 0.3s, bottom 0.3s, visibility 0.3s;
+    text-align: center;
+    width: 90%;
+    max-width: 400px;
+    box-sizing: border-box;
 }
 
 #toast-notification.show {
@@ -717,15 +735,29 @@ input:checked + .slider:before { transform: translateX(26px); }
 .slider.round:before { border-radius: 50%; }
 
 
+@media (max-width: 900px) {
+    .app-header h1 {
+        flex-basis: auto; /* Allow title and controls to share space */
+    }
+    .header-controls {
+        justify-content: space-around;
+    }
+}
+
+
 @media (max-width: 768px) {
     .app-header {
         flex-direction: column;
-        gap: 15px;
+        gap: 20px;
     }
 
     .controls {
         flex-direction: column;
         align-items: stretch;
+    }
+
+    .input-group {
+        min-width: 100%;
     }
 
     .text-input,
@@ -744,7 +776,12 @@ input:checked + .slider:before { transform: translateX(26px); }
     }
 
     .popup-content {
-        padding: 20px;
+        padding: 15px;
+        max-height: 95vh;
+    }
+
+    .popup-title {
+        font-size: 1.3em;
     }
 }
 
