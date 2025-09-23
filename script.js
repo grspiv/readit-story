@@ -403,7 +403,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (storyText) {
-                finalContent += `<p>${storyText.replace(/\n/g, '<br>')}</p>`;
+                finalContent += `<div class="markdown-content">${renderMarkdown(storyText)}</div>`;
             }
             
             finalContent += `<hr><div id="comment-section" data-op-author="${story.author}"></div>`;
@@ -468,7 +468,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     return `
                     <div class="comment-card ${opClass}" data-comment-author="${c.author}">
                         <p class="comment-author"><span class="collapse-comment">[–]</span>u/${c.author} ${opLabel}</p>
-                        <p class="comment-body">${commentBody.replace(/\n/g, '<br>')}</p>
+                        <div class="comment-body markdown-content">${renderMarkdown(commentBody)}</div>
                     </div>`
                 }).join('');
                 commentSection.insertAdjacentHTML('beforeend', commentsHTML);
@@ -721,6 +721,11 @@ document.addEventListener('DOMContentLoaded', () => {
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
         
+        function renderMarkdown(text) {
+            if (!text) return '';
+            return marked.parse(text, { breaks: true });
+        }
+
         // --- Saved & History Functions ---
         function getHistory() {
             const history = JSON.parse(localStorage.getItem(READ_HISTORY_KEY)) || [];
@@ -757,7 +762,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     history.sort((a, b) => new Date(a.readAt) - new Date(b.readAt));
                     break;
                 case 'score-desc':
-                    history.sort((a, b) => b.score - a.score);
+                    history.sort((a, b) => (b.score || 0) - (a.score || 0));
                     break;
                 case 'subreddit-az':
                     history.sort((a, b) => a.subreddit.localeCompare(b.subreddit));
@@ -831,7 +836,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     savedStories.sort((a, b) => new Date(a.dateSaved) - new Date(b.dateSaved));
                     break;
                 case 'score-desc':
-                    savedStories.sort((a, b) => b.score - a.score);
+                    savedStories.sort((a, b) => (b.score || 0) - (a.score || 0));
                     break;
                 case 'subreddit-az':
                     savedStories.sort((a, b) => a.subreddit.localeCompare(b.subreddit));
