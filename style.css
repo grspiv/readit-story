@@ -259,6 +259,12 @@ body {
 .action-button.secondary:hover {
     background-color: var(--secondary-button-hover);
 }
+.action-button.surprise {
+    background-color: var(--accent-color);
+}
+.action-button.surprise:hover {
+    background-color: #8e44ad;
+}
 .action-button.secondary.active {
     background-color: var(--heading-color);
     color: var(--card-bg);
@@ -1090,4 +1096,3 @@ input:checked + .slider:before { transform: translateX(26px); }
         align-items: flex-start;
     }
 }
-

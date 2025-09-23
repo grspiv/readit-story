@@ -3,6 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // --- DOM Elements ---
         const fetchButton = document.getElementById('fetch-button');
         const randomButton = document.getElementById('random-button');
+        const surpriseButton = document.getElementById('surprise-button');
         const subredditInput = document.getElementById('subreddit-input');
         const searchInput = document.getElementById('search-input');
         const sortSelect = document.getElementById('sort-select');
@@ -27,6 +28,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const importFileInput = document.getElementById('import-file-input');
         const clearSavedContainer = document.getElementById('clear-saved-container');
         const flairFilterInput = document.getElementById('flair-filter-input');
+        const minScoreInput = document.getElementById('min-score-input');
+        const minCommentsInput = document.getElementById('min-comments-input');
         const filterSection = document.getElementById('filter-section');
         const savedSortSection = document.getElementById('saved-sort-section');
         const savedSortSelect = document.getElementById('saved-sort-select');
@@ -56,7 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const GALLERY_PREFERENCE_KEY = 'redditStorytellerGallery';
         const NSFW_PREFERENCE_KEY = 'redditStorytellerNSFW';
         const READING_SETTINGS_KEY = 'redditStorytellerReading';
-        const RANDOM_SUBREDDITS = ['nosleep', 'LetsNotMeet', 'glitch_in_the_matrix', 'tifu', 'confession', 'maliciouscompliance', 'talesfromtechsupport', 'WritingPrompts', 'shortscarystories', 'UnresolvedMysteries'];
+        const RANDOM_SUBREDDITS = ['nosleep', 'LetsNotMeet', 'glitch_in_the_matrix', 'tifu', 'confession', 'maliciouscompliance', 'talesfromtechsupport', 'WritingPrompts', 'shortscarystories', 'UnresolvedMysteries', 'ProRevenge', 'IDontWorkHereLady'];
         
         let currentView = 'browsing'; // browsing, saved, history
         let currentAfterToken = null;
@@ -88,6 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
         nsfwToggle.addEventListener('change', () => applyNSFWPreference(nsfwToggle.checked, true));
         fetchButton.addEventListener('click', () => switchToView('browsing', { refresh: true }));
         randomButton.addEventListener('click', handleRandomClick);
+        surpriseButton.addEventListener('click', handleSurpriseClick);
         sortSelect.addEventListener('change', handleSortChange);
         viewSavedButton.addEventListener('click', () => switchToView('saved'));
         viewHistoryButton.addEventListener('click', () => switchToView('history'));
@@ -99,6 +103,8 @@ document.addEventListener('DOMContentLoaded', () => {
         savedSortSelect.addEventListener('change', displaySavedStories);
         historySortSelect.addEventListener('change', displayHistory);
         flairFilterInput.addEventListener('input', () => renderFilteredStories());
+        minScoreInput.addEventListener('input', () => renderFilteredStories());
+        minCommentsInput.addEventListener('input', () => renderFilteredStories());
         searchInput.addEventListener('input', () => {
             clearSearchButton.style.display = searchInput.value ? 'block' : 'none';
         });
@@ -126,7 +132,7 @@ document.addEventListener('DOMContentLoaded', () => {
             window.scrollTo({ top: 0, behavior: 'smooth' });
 
             // Hide all view-specific sections
-            [controlsSection, filterSection, savedSortSection, clearSavedContainer, historySortSection, clearHistoryContainer, subredditInfoPanel].forEach(el => el.style.display = 'none');
+            [controlsSection, savedSortSection, clearSavedContainer, historySortSection, clearHistoryContainer, subredditInfoPanel].forEach(el => el.style.display = 'none');
             [viewSavedButton, viewHistoryButton].forEach(btn => btn.classList.remove('active'));
 
             if (view === 'browsing') {
@@ -217,6 +223,41 @@ document.addEventListener('DOMContentLoaded', () => {
             subredditInput.value = randomSub;
             searchInput.value = '';
             switchToView('browsing', { refresh: true });
+        }
+
+        async function handleSurpriseClick() {
+            showToast('Finding a great story for you...');
+            surpriseButton.disabled = true;
+            surpriseButton.classList.add('pulse-active');
+
+            const randomSub = RANDOM_SUBREDDITS[Math.floor(Math.random() * RANDOM_SUBREDDITS.length)];
+            const url = `${REDDIT_API_BASE_URL}${randomSub}/top.json?t=year&limit=50`;
+
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('Could not fetch top stories.');
+                const data = await response.json();
+                const stories = data.data.children.map(p => p.data).filter(p => p.selftext); // Only stories with text
+
+                if (stories.length === 0) {
+                    throw new Error(`No text-based stories found in r/${randomSub}.`);
+                }
+
+                const randomStory = stories[Math.floor(Math.random() * stories.length)];
+                
+                if (!allFetchedPosts.some(p => p.id === randomStory.id)) {
+                    allFetchedPosts.push(randomStory);
+                }
+
+                fetchAndShowComments(randomStory);
+
+            } catch (error) {
+                console.error("Surprise Me Error:", error);
+                showErrorPopup(error.message || "Failed to find a story. Please try again.");
+            } finally {
+                surpriseButton.disabled = false;
+                surpriseButton.classList.remove('pulse-active');
+            }
         }
 
         function handleLoadMore() {
@@ -318,6 +359,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 allFetchedPosts = [];
                 currentAfterToken = null;
                 flairFilterInput.value = '';
+                minScoreInput.value = '';
+                minCommentsInput.value = '';
                 storyContainer.innerHTML = '';
                  if (!subreddit.includes('+') && !query) {
                     fetchSubredditInfo(subreddit);
@@ -442,6 +485,13 @@ document.addEventListener('DOMContentLoaded', () => {
             linkEl.title = 'View on Reddit';
             linkEl.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>`;
             headerActions.appendChild(linkEl);
+
+            const downloadBtn = document.createElement('button');
+            downloadBtn.className = 'icon-button';
+            downloadBtn.title = 'Download Story';
+            downloadBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>`;
+            downloadBtn.onclick = () => downloadStory(story);
+            headerActions.appendChild(downloadBtn);
 
             document.body.style.overflow = 'hidden';
             popupOverlay.classList.add('active');
@@ -575,6 +625,8 @@ document.addEventListener('DOMContentLoaded', () => {
         
         function renderFilteredStories() {
             const flairFilter = flairFilterInput.value.trim().toLowerCase();
+            const minScore = parseInt(minScoreInput.value, 10) || 0;
+            const minComments = parseInt(minCommentsInput.value, 10) || 0;
             const readStories = getHistory().map(h => h.id);
 
             storyContainer.querySelectorAll('.story-card').forEach(card => {
@@ -584,7 +636,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!story) return;
 
                 const flairMatch = !flairFilter || (story.link_flair_text && story.link_flair_text.toLowerCase().includes(flairFilter));
-                card.style.display = flairMatch ? 'flex' : 'none';
+                const scoreMatch = story.score >= minScore;
+                const commentsMatch = story.num_comments >= minComments;
+                
+                card.style.display = (flairMatch && scoreMatch && commentsMatch) ? 'flex' : 'none';
 
                 if (readStories.includes(storyId)) {
                     card.classList.add('read');
@@ -593,7 +648,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
             
-            const isImageHeavy = allFetchedPosts.filter(p => p.post_hint === 'image').length / allFetchedPosts.length > 0.5;
+            const isImageHeavy = allFetchedPosts.length > 0 && allFetchedPosts.filter(p => p.post_hint === 'image').length / allFetchedPosts.length > 0.5;
             galleryToggleButton.style.display = isImageHeavy ? 'flex' : 'none';
         }
 
@@ -1000,6 +1055,43 @@ document.addEventListener('DOMContentLoaded', () => {
                 dataList.appendChild(option);
             });
         }
+
+        function downloadStory(story) {
+            try {
+                const comments = [...popupBody.querySelectorAll('.comment-card')].map(card => {
+                    if (card.classList.contains('collapsed')) return '';
+                    const author = card.dataset.commentAuthor;
+                    const body = card.querySelector('.comment-body').innerText;
+                    return `Comment by u/${author}:\n${body}\n\n--------------------\n\n`;
+                }).join('');
+
+                const storyContent = `Title: ${story.title}\r\n` +
+                                     `Author: u/${story.author}\r\n` +
+                                     `Subreddit: ${story.subreddit_name_prefixed}\r\n` +
+                                     `Link: https://www.reddit.com${story.permalink}\r\n` +
+                                     `Score: ${story.score}\r\n` +
+                                     `Comments: ${story.num_comments}\r\n\r\n` +
+                                     `====================\r\n\r\n` +
+                                     `${story.selftext}\r\n\r\n` +
+                                     `====================\r\nCOMMENTS\r\n====================\r\n\r\n` +
+                                     `${comments}`;
+
+                const blob = new Blob([storyContent], { type: 'text/plain;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                const safeFilename = story.title.replace(/[^a-z0-9]/gi, '_').slice(0, 50);
+                link.download = `${safeFilename}.txt`;
+                link.href = url;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+                showToast('Story downloaded!');
+            } catch (error) {
+                console.error('Download error:', error);
+                showErrorPopup('Could not prepare the story for download.');
+            }
+        }
         
         // --- Reading Controls & Keyboard Nav ---
         function getReadingSettings() {
@@ -1084,7 +1176,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         function handleKeyboardNav(e) {
             const isPopupActive = popupOverlay.classList.contains('active');
-            const isTyping = document.activeElement.tagName === 'INPUT';
+            const isTyping = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName);
 
             if (isTyping && !isPopupActive) return;
 
@@ -1165,4 +1257,3 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.innerHTML = "<h1>A critical error occurred. Please refresh the page.</h1>";
     }
 });
-
