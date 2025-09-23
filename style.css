@@ -13,6 +13,8 @@
     --secondary-button-bg: #95a5a6;
     --secondary-button-hover: #7f8c8d;
     --mod-color: #2ecc71; /* Color for moderator posts */
+    --popup-font-size: 1.1em;
+    --popup-line-height: 1.6;
 }
 
 body.dark {
@@ -248,6 +250,12 @@ body {
     backface-visibility: hidden;
     transform: translateZ(0);
 }
+
+.story-card.active-card {
+    border-color: var(--highlight-color);
+    box-shadow: 0 8px 16px var(--shadow-color), 0 0 0 4px var(--highlight-color);
+}
+
 
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(20px); }
@@ -633,11 +641,45 @@ body {
     display: flex;
     gap: 10px;
     flex-wrap: wrap;
+    align-items: center;
 }
 
-.popup-body {
-    font-size: 1.1em;
+.reading-controls {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+    background-color: var(--border-color);
+    padding: 5px;
+    border-radius: 20px;
+}
+
+.reading-controls span {
+    font-size: 0.9em;
+    font-weight: 500;
+    margin: 0 5px;
+}
+
+.reading-controls .icon-button {
+    background-color: var(--card-bg);
     color: var(--text-color);
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+.reading-controls .icon-button:hover {
+    background-color: var(--highlight-color);
+    color: white;
+}
+
+
+.popup-body {
+    font-size: var(--popup-font-size);
+    line-height: var(--popup-line-height);
+    color: var(--text-color);
+    transition: font-size 0.2s ease, line-height 0.2s ease;
 }
 
 .popup-media {

@@ -44,6 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const LAYOUT_PREFERENCE_KEY = 'redditStorytellerLayout';
         const GALLERY_PREFERENCE_KEY = 'redditStorytellerGallery';
         const NSFW_PREFERENCE_KEY = 'redditStorytellerNSFW';
+        const READING_SETTINGS_KEY = 'redditStorytellerReading';
         const RANDOM_SUBREDDITS = ['nosleep', 'LetsNotMeet', 'glitch_in_the_matrix', 'tifu', 'confession', 'maliciouscompliance', 'talesfromtechsupport', 'WritingPrompts', 'shortscarystories', 'UnresolvedMysteries'];
         let currentAfterToken = null;
         let isShowingSaved = false;
@@ -58,6 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
         applyTheme(savedTheme);
         applyLayout(savedLayout);
         applyNSFWPreference(savedNSFWPreference);
+        applyReadingSettings();
         populateSubredditHistory();
         
         const initialSubreddit = RANDOM_SUBREDDITS[Math.floor(Math.random() * RANDOM_SUBREDDITS.length)];
@@ -84,6 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
         popupOverlay.addEventListener('click', (e) => e.target === popupOverlay && closePopup());
         window.onscroll = handleScroll;
         backToTopButton.addEventListener('click', scrollToTop);
+        document.addEventListener('keydown', handleKeyboardNav);
 
         // --- Functions ---
         function applyTheme(theme) {
@@ -304,18 +307,20 @@ document.addEventListener('DOMContentLoaded', () => {
             
             popupControls.innerHTML = `
                 <button id="read-aloud-button" class="action-button secondary">Read Aloud</button>
-                <button id="stop-reading-button" class="action-button" style="display:none;">Stop Reading</button>
+                <button id="stop-reading-button" class="action-button" style="display:none;">Stop</button>
+                <div class="reading-controls">
+                    <span>Font Size:</span>
+                    <button id="font-size-down" class="icon-button" title="Decrease Font Size">A-</button>
+                    <button id="font-size-up" class="icon-button" title="Increase Font Size">A+</button>
+                </div>
+                <div class="reading-controls">
+                    <span>Line Height:</span>
+                    <button id="line-height-down" class="icon-button" title="Decrease Line Height"> Less</button>
+                    <button id="line-height-up" class="icon-button" title="Increase Line Height">More</button>
+                </div>
             `;
 
-            const readAloudButton = document.getElementById('read-aloud-button');
-            const stopReadingButton = document.getElementById('stop-reading-button');
-
-            readAloudButton.addEventListener('click', () => handleReadAloud(story));
-            stopReadingButton.addEventListener('click', () => {
-                window.speechSynthesis.cancel();
-                readAloudButton.style.display = 'inline-block';
-                stopReadingButton.style.display = 'none';
-            });
+            setupReadingControls();
             
             let headerActions = header.querySelector('.popup-header-actions');
             if (!headerActions) {
@@ -463,10 +468,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
 
-            if (filteredPosts.length === 0) {
-                storyContainer.innerHTML = `<p class="empty-state">No stories found with the current filters.</p>`;
-            } else {
+            if (filteredPosts.length > 0) {
                 displayStories(filteredPosts);
+            } else {
+                storyContainer.innerHTML = `<p class="empty-state">No stories found with the current filters.</p>`;
             }
 
             const hasAnyFlair = posts.some(p => p.link_flair_text);
@@ -755,7 +760,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     showErrorPopup("Import failed. The file is either corrupted or not in the correct format.");
                     console.error("Import error:", error);
                 } finally {
-                    // Reset file input to allow re-uploading the same file
                     importFileInput.value = '';
                 }
             };
@@ -788,6 +792,104 @@ document.addEventListener('DOMContentLoaded', () => {
                 dataList.appendChild(option);
             });
         }
+        
+        // --- Reading Controls & Keyboard Nav ---
+        function getReadingSettings() {
+            return JSON.parse(localStorage.getItem(READING_SETTINGS_KEY)) || { fontSize: 1.1, lineHeight: 1.6 };
+        }
+
+        function saveReadingSettings(settings) {
+            localStorage.setItem(READING_SETTINGS_KEY, JSON.stringify(settings));
+        }
+
+        function applyReadingSettings() {
+            const settings = getReadingSettings();
+            document.documentElement.style.setProperty('--popup-font-size', `${settings.fontSize}em`);
+            document.documentElement.style.setProperty('--popup-line-height', settings.lineHeight);
+        }
+        
+        function setupReadingControls() {
+            const readAloudButton = document.getElementById('read-aloud-button');
+            const stopReadingButton = document.getElementById('stop-reading-button');
+            const fontSizeUp = document.getElementById('font-size-up');
+            const fontSizeDown = document.getElementById('font-size-down');
+            const lineHeightUp = document.getElementById('line-height-up');
+            const lineHeightDown = document.getElementById('line-height-down');
+            
+            readAloudButton.addEventListener('click', handleReadAloud);
+            stopReadingButton.addEventListener('click', () => {
+                window.speechSynthesis.cancel();
+                readAloudButton.style.display = 'inline-block';
+                stopReadingButton.style.display = 'none';
+            });
+
+            fontSizeUp.addEventListener('click', () => updateReadingSetting('fontSize', 0.1));
+            fontSizeDown.addEventListener('click', () => updateReadingSetting('fontSize', -0.1));
+            lineHeightUp.addEventListener('click', () => updateReadingSetting('lineHeight', 0.1));
+            lineHeightDown.addEventListener('click', () => updateReadingSetting('lineHeight', -0.1));
+        }
+
+        function updateReadingSetting(setting, change) {
+            const settings = getReadingSettings();
+            if (setting === 'fontSize') {
+                settings.fontSize = Math.max(0.5, settings.fontSize + change); // Min font size 0.5em
+            } else if (setting === 'lineHeight') {
+                settings.lineHeight = Math.max(1, settings.lineHeight + change); // Min line height 1
+            }
+            saveReadingSettings(settings);
+            applyReadingSettings();
+        }
+
+        function handleKeyboardNav(e) {
+            const isPopupActive = popupOverlay.classList.contains('active');
+            const isTyping = document.activeElement.tagName === 'INPUT';
+
+            if (isTyping && !isPopupActive) return;
+
+            const cards = [...storyContainer.querySelectorAll('.story-card')];
+            let activeCard = storyContainer.querySelector('.active-card');
+            let currentIndex = activeCard ? cards.indexOf(activeCard) : -1;
+            
+            switch (e.key) {
+                case 'Escape':
+                    if (isPopupActive) closePopup();
+                    break;
+                case 'j':
+                    if (!isPopupActive) {
+                        e.preventDefault();
+                        if (currentIndex < cards.length - 1) {
+                            currentIndex++;
+                            setActiveCard(cards[currentIndex]);
+                        }
+                    }
+                    break;
+                case 'k':
+                     if (!isPopupActive) {
+                        e.preventDefault();
+                        if (currentIndex > 0) {
+                            currentIndex--;
+                            setActiveCard(cards[currentIndex]);
+                        }
+                    }
+                    break;
+                case 'o':
+                case 'Enter':
+                     if (!isPopupActive && activeCard) {
+                        e.preventDefault();
+                        activeCard.click();
+                    }
+                    break;
+            }
+        }
+        
+        function setActiveCard(card) {
+            storyContainer.querySelector('.active-card')?.classList.remove('active-card');
+            if (card) {
+                card.classList.add('active-card');
+                card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+
 
     } catch (e) {
         console.error("An error occurred during page initialization:", e);

@@ -20,34 +20,36 @@
                 </select>
             </div>
             <div class="filter-switch">
-                <label for="nsfw-toggle" class="switch-label">Blur NSFW/Spoiler</label>
+                <label for="nsfw-toggle">Blur NSFW</label>
                 <label class="switch">
                     <input type="checkbox" id="nsfw-toggle">
                     <span class="slider round"></span>
                 </label>
             </div>
-             <div class="layout-controls">
-                <button id="layout-toggle-button" class="icon-button" title="Toggle Layout">
-                    <svg id="layout-icon-grid" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
-                    <svg id="layout-icon-list" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
-                </button>
-                <button id="gallery-toggle-button" class="icon-button" title="Toggle Gallery View" style="display: none;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
-                </button>
-            </div>
+        </div>
+        <div class="layout-controls">
+            <button id="layout-toggle-button" class="icon-button" title="Toggle List/Grid View">
+                <svg id="layout-icon-grid" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                <svg id="layout-icon-list" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+            </button>
+            <button id="gallery-toggle-button" class="icon-button" title="Toggle Gallery View" style="display: none;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+            </button>
         </div>
     </header>
     
     <main class="main-content">
         <section class="controls">
             <div class="input-group main-input">
-                <label for="subreddit-input">Subreddit (+ for multi)</label>
+                <label for="subreddit-input">Subreddit:</label>
                 <input type="text" id="subreddit-input" list="subreddit-list" class="text-input">
-                <datalist id="subreddit-list"></datalist>
+                <datalist id="subreddit-list">
+                    <!-- Populated by JS -->
+                </datalist>
             </div>
              <div class="input-group">
-                <label for="search-input">Search Keywords</label>
-                <input type="text" id="search-input" placeholder="e.g., forest, cabin..." class="text-input">
+                <label for="search-input">Search:</label>
+                <input type="text" id="search-input" class="text-input" placeholder="Keywords or author:name">
             </div>
             <div class="input-group">
                 <label for="sort-select">Sort by:</label>
@@ -56,10 +58,9 @@
                     <option value="new">New</option>
                     <option value="top">Top</option>
                     <option value="rising">Rising</option>
-                    <option value="best">Best</option>
                 </select>
             </div>
-             <div id="time-range-controls" class="input-group" style="display: none;">
+             <div class="input-group" id="time-range-controls" style="display: none;">
                 <label for="time-range-select">Time Range:</label>
                 <select id="time-range-select" class="dropdown-input">
                     <option value="all">All Time</option>
@@ -69,43 +70,40 @@
                     <option value="day">Past 24 Hours</option>
                 </select>
             </div>
+            <button id="fetch-button" class="action-button">Get Stories</button>
+            <button id="random-button" class="action-button secondary">Random Sub</button>
         </section>
+        
+        <div id="filter-section" style="display: none;" class="controls">
+            <div class="input-group">
+                <label for="flair-filter-input">Filter by Flair:</label>
+                <input type="text" id="flair-filter-input" class="text-input" placeholder="e.g., Series">
+            </div>
+        </div>
 
         <section class="action-bar">
-            <button id="fetch-button" class="action-button">Get Stories</button>
-            <button id="random-button" class="action-button secondary">Random</button>
             <button id="view-saved-button" class="action-button secondary">Saved Stories</button>
-        </section>
-
-        <section id="filter-section" class="controls" style="display: none;">
-            <div class="input-group">
-                <label for="flair-filter-input">Filter by Flair</label>
-                <input type="text" id="flair-filter-input" placeholder="e.g., Series, True Story" class="text-input">
-            </div>
-        </section>
-
-        <section id="saved-sort-section" class="controls" style="display: none;">
-             <div class="input-group">
-                <label for="saved-sort-select">Sort Saved By:</label>
-                <select id="saved-sort-select" class="dropdown-input">
-                    <option value="date-desc">Date Saved (Newest)</option>
-                    <option value="date-asc">Date Saved (Oldest)</option>
-                    <option value="score-desc">Score</option>
-                    <option value="subreddit-az">Subreddit (A-Z)</option>
-                </select>
-            </div>
-            <div id="clear-saved-container" class="input-group" style="display:none;">
-                <label>Manage Saved</label>
-                <div>
-                    <button id="export-saved-button" class="action-button secondary">Export</button>
-                    <button id="import-saved-button" class="action-button secondary">Import</button>
-                    <button id="clear-saved-button" class="action-button danger">Clear All</button>
-                    <input type="file" id="import-file-input" accept=".json" style="display: none;">
+            <div id="saved-sort-section" style="display: none;">
+                <div class="input-group">
+                    <label for="saved-sort-select">Sort Saved By:</label>
+                    <select id="saved-sort-select" class="dropdown-input">
+                        <option value="date-desc">Date Saved (Newest)</option>
+                        <option value="date-asc">Date Saved (Oldest)</option>
+                        <option value="score-desc">Score</option>
+                        <option value="subreddit-az">Subreddit (A-Z)</option>
+                    </select>
                 </div>
+            </div>
+            <div id="clear-saved-container" style="display: none;">
+                 <button id="export-saved-button" class="action-button secondary">Export</button>
+                 <button id="import-saved-button" class="action-button secondary">Import</button>
+                 <input type="file" id="import-file-input" accept=".json" style="display:none;">
+                 <button id="clear-saved-button" class="action-button danger">Clear All Saved</button>
             </div>
         </section>
 
         <h2 id="stories-heading"></h2>
+
         <section id="story-container" class="story-container"></section>
 
         <div id="loading-indicator" class="loading-indicator" style="display: none;">
@@ -122,10 +120,14 @@
                 <h2 id="popup-title" class="popup-title"></h2>
                  <div class="popup-header-actions"></div>
                 <button id="close-popup" class="close-button">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
                 </button>
             </div>
-            <div class="popup-controls"></div>
+            <div class="popup-controls">
+                 <!-- Populated by JS -->
+            </div>
             <div id="popup-body" class="popup-body"></div>
         </div>
     </div>
@@ -138,5 +140,4 @@
     <script src="script.js"></script>
 </body>
 </html>
-
 
