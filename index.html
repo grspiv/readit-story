@@ -118,6 +118,10 @@
                 <div class="input-group search-container">
                     <input type="text" id="saved-search-input" class="text-input" placeholder="Search saved stories..." aria-label="Search within saved stories">
                 </div>
+                <div id="saved-tags-filter" class="saved-tags-filter">
+                    <h4>Filter by Tag:</h4>
+                    <div id="tags-container"></div>
+                </div>
             </div>
              <div id="history-sort-section" class="input-group" style="display: none;">
                 <label for="history-sort-select">Sort History by:</label>
@@ -182,6 +186,11 @@
             <div id="comment-navigator" class="comment-navigator" style="display: none;"></div>
             <div id="series-navigation" class="series-navigation"></div>
             <div id="popup-body" class="popup-body"></div>
+            <div id="saved-story-tags-container" class="saved-story-tags-container" style="display: none;">
+                <h4>Tags</h4>
+                <div id="story-tags" class="story-tags"></div>
+                <input type="text" id="add-tag-input" placeholder="Add a tag and press Enter..." aria-label="Add a tag to this story">
+            </div>
             <div id="saved-story-notes-container" class="saved-story-notes-container" style="display: none;">
                 <h4>My Notes</h4>
                 <textarea id="saved-story-notes" placeholder="Add personal notes for this story..." aria-label="My notes for this story"></textarea>
@@ -232,6 +241,7 @@
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
     </button>
     <div id="toast-notification" role="alert" aria-live="assertive"></div>
+    <div id="quick-look-popup"></div>
     <script src="script.js"></script>
 </body>
 </html>

@@ -66,6 +66,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const wordCloudOverlay = document.getElementById('word-cloud-overlay');
         const closeWordCloudPopup = document.getElementById('close-word-cloud-popup');
         const wordCloudContainer = document.getElementById('word-cloud-container');
+        const savedTagsFilter = document.getElementById('saved-tags-filter');
+        const tagsContainer = document.getElementById('tags-container');
+        const savedStoryTagsContainer = document.getElementById('saved-story-tags-container');
+        const storyTags = document.getElementById('story-tags');
+        const addTagInput = document.getElementById('add-tag-input');
+        const quickLookPopup = document.getElementById('quick-look-popup');
 
 
         // --- Constants & State ---
@@ -92,6 +98,9 @@ document.addEventListener('DOMContentLoaded', () => {
         let currentSeries = { parts: [], currentIndex: -1 };
         let topLevelComments = [];
         let currentCommentIndex = -1;
+        let liveCommentsInterval = null;
+        let activeTagFilter = null;
+        let quickLookTimeout = null;
 
         // --- Initialization ---
         const savedTheme = localStorage.getItem('theme') || 'light';
@@ -160,6 +169,14 @@ document.addEventListener('DOMContentLoaded', () => {
         collapseCommentsToggle.addEventListener('change', () => applyCollapseCommentsPreference(collapseCommentsToggle.checked, true));
         savedStoryNotes.addEventListener('input', debounce(saveStoryNote, 500));
         markAllReadButton.addEventListener('click', handleMarkAllRead);
+        addTagInput.addEventListener('keydown', handleAddTag);
+        storyContainer.addEventListener('mouseover', handleQuickLook);
+        storyContainer.addEventListener('mouseout', hideQuickLook);
+        storyContainer.addEventListener('mousemove', (e) => {
+            if (quickLookPopup.classList.contains('visible')) {
+                positionQuickLook(e);
+            }
+        });
 
         // --- Main View Controller ---
         function switchToView(view, options = {}) {
@@ -169,6 +186,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             currentView = view;
+            activeTagFilter = null; // Reset tag filter when switching views
             window.scrollTo({ top: 0, behavior: 'smooth' });
 
             // Hide all view-specific sections
@@ -181,7 +199,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 viewSavedButton.textContent = 'Saved Stories';
                 viewHistoryButton.textContent = 'History';
                 if (options.refresh) {
-                    const subreddit = subredditInput.value.trim();
+                    const subreddit = subredditInput.value.trim().replace(/\s*\+\s*/g, '+'); // Sanitize multi-reddit input
                     const sort = sortSelect.value;
                     const timeRange = timeRangeSelect.value;
                     currentSearchQuery = searchInput.value.trim();
@@ -331,7 +349,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         function handleLoadMore() {
-            const subreddit = subredditInput.value.trim();
+            const subreddit = subredditInput.value.trim().replace(/\s*\+\s*/g, '+'); // Sanitize multi-reddit input
             const sort = sortSelect.value;
             const timeRange = timeRangeSelect.value;
 
@@ -349,6 +367,10 @@ document.addEventListener('DOMContentLoaded', () => {
         function closePopup() {
             saveReadingPosition(); // Save position on close
             window.speechSynthesis.cancel();
+            if (liveCommentsInterval) {
+                clearInterval(liveCommentsInterval);
+                liveCommentsInterval = null;
+            }
             popupOverlay.classList.remove('active');
             document.body.style.overflow = 'auto';
             const video = popupBody.querySelector('video');
@@ -518,6 +540,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="popup-actions-left">
                     <button id="read-aloud-toggle" class="action-button secondary">Read Aloud</button>
                     <button id="word-cloud-button" class="action-button secondary">Word Cloud</button>
+                    <button id="live-comments-button" class="action-button secondary">Live Comments</button>
                 </div>
                 <div class="popup-actions-right">
                      <div class="reading-controls">
@@ -547,6 +570,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 fetchCommentsForCurrentStory(e.target.value);
             });
             document.getElementById('word-cloud-button').addEventListener('click', () => generateWordCloud(story));
+            document.getElementById('live-comments-button').addEventListener('click', toggleLiveComments);
             
             let headerActions = header.querySelector('.popup-header-actions');
             if (!headerActions) {
@@ -587,12 +611,15 @@ document.addEventListener('DOMContentLoaded', () => {
             downloadBtn.onclick = () => downloadStory(story);
             headerActions.appendChild(downloadBtn);
 
-            // Handle notes section for saved stories
+            // Handle notes & tags section for saved stories
             if (isStorySaved(story.id)) {
                 savedStoryNotesContainer.style.display = 'block';
+                savedStoryTagsContainer.style.display = 'block';
                 savedStoryNotes.value = getStoryNote(story.id);
+                renderStoryTags(story.id);
             } else {
                 savedStoryNotesContainer.style.display = 'none';
+                savedStoryTagsContainer.style.display = 'none';
             }
 
             document.body.style.overflow = 'hidden';
@@ -696,7 +723,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const collapseSymbol = shouldCollapse ? '[+]' : '[–]';
 
                     return `
-                    <div class="comment-card ${opClass} ${collapsedClass}" data-comment-author="${c.author}">
+                    <div class="comment-card ${opClass} ${collapsedClass}" data-comment-id="${c.id}" data-comment-author="${c.author}">
                         <p class="comment-author"><span class="collapse-comment">${collapseSymbol}</span><a href="#" class="author-link">u/${c.author}</a> ${opLabel}</p>
                         <div class="comment-body markdown-content">${renderMarkdown(commentBody)}</div>
                     </div>`
@@ -1065,7 +1092,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
          function handleClearSaved() {
             if (confirm("Are you sure you want to delete all saved stories? This cannot be undone.")) {
-                localStorage.removeItem(SAVED_STORIES_KEY);
+                localStorage.setItem(SAVED_STORIES_KEY, JSON.stringify([]));
                 localStorage.removeItem(STORY_NOTES_KEY);
                 displaySavedStories();
             }
@@ -1073,7 +1100,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         function toggleSaveStory(event, story) {
             const button = event.target;
-            const savedStories = getSavedStories();
+            let savedStories = getSavedStories();
             const storyIndex = savedStories.findIndex(s => s.id === story.id);
 
             if (storyIndex > -1) {
@@ -1082,15 +1109,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 button.classList.remove('saved');
                 if (popupOverlay.classList.contains('active') && currentStoryId === story.id) {
                     savedStoryNotesContainer.style.display = 'none';
+                    savedStoryTagsContainer.style.display = 'none';
                 }
             } else {
-                const storyToSave = { ...story, dateSaved: new Date().toISOString() };
+                const storyToSave = { ...story, dateSaved: new Date().toISOString(), tags: [] };
                 savedStories.push(storyToSave);
                 button.textContent = 'Saved';
                 button.classList.add('saved');
                  if (popupOverlay.classList.contains('active') && currentStoryId === story.id) {
                     savedStoryNotesContainer.style.display = 'block';
+                    savedStoryTagsContainer.style.display = 'block';
                     savedStoryNotes.value = getStoryNote(story.id);
+                    renderStoryTags(story.id);
                 }
             }
             localStorage.setItem(SAVED_STORIES_KEY, JSON.stringify(savedStories));
@@ -1109,6 +1139,8 @@ document.addEventListener('DOMContentLoaded', () => {
             storyContainer.innerHTML = '';
             
             let savedStories = getSavedStories();
+            renderTagFilters();
+            
             const searchTerm = savedSearchInput.value.trim().toLowerCase();
 
             if (searchTerm) {
@@ -1117,6 +1149,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     (story.selftext && story.selftext.toLowerCase().includes(searchTerm)) || 
                     story.subreddit.toLowerCase().includes(searchTerm)
                 );
+            }
+
+            if(activeTagFilter) {
+                savedStories = savedStories.filter(story => story.tags && story.tags.includes(activeTagFilter));
             }
 
             const sortMethod = savedSortSelect.value;
@@ -1142,7 +1178,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 clearSavedContainer.style.display = 'flex';
                 displayStories(savedStories);
                  if (savedStories.length === 0) {
-                    storyContainer.innerHTML = `<p class="empty-state">No saved stories match your search.</p>`;
+                    storyContainer.innerHTML = `<p class="empty-state">No saved stories match your search or filter.</p>`;
                 }
             } else {
                 clearSavedContainer.style.display = 'none';
@@ -1193,6 +1229,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     importedStories.forEach(story => {
                         if (story.id && !existingIds.has(story.id)) {
+                             // Ensure imported stories have a tags array
+                            if (!story.tags) story.tags = [];
                             existingStories.push(story);
                             newStoriesCount++;
                         }
@@ -1315,7 +1353,7 @@ document.addEventListener('DOMContentLoaded', () => {
         function applyReadingSettings() {
             const settings = getReadingSettings();
             document.documentElement.style.setProperty('--popup-font-size', `${settings.fontSize}em`);
-            document.documentElement.style.setProperty('--popup-line-height', settings.lineHeight);
+            document.documentElement.style.setProperty('--popup-line-height', `${settings.lineHeight}`);
         }
         
         function setupReadingControls(story) {
@@ -1458,6 +1496,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 e.preventDefault();
                 const author = authorLink.textContent.replace('u/', '');
                 fetchUserProfile(author);
+            }
+            const removeTagBtn = e.target.closest('.remove-tag');
+            if(removeTagBtn) {
+                const tag = removeTagBtn.parentElement.dataset.tag;
+                removeTagFromStory(currentStoryId, tag);
             }
         }
         
@@ -1687,7 +1730,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
         
-        // --- Story Notes Functions ---
+        // --- Story Notes & Tags Functions ---
         function getStoryNotes() {
             return JSON.parse(localStorage.getItem(STORY_NOTES_KEY)) || {};
         }
@@ -1702,6 +1745,97 @@ document.addEventListener('DOMContentLoaded', () => {
             const notes = getStoryNotes();
             notes[currentStoryId] = savedStoryNotes.value;
             localStorage.setItem(STORY_NOTES_KEY, JSON.stringify(notes));
+        }
+
+        function handleAddTag(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const tag = addTagInput.value.trim().toLowerCase();
+                if (tag && currentStoryId) {
+                    addTagToStory(currentStoryId, tag);
+                    addTagInput.value = '';
+                }
+            }
+        }
+
+        function addTagToStory(storyId, tag) {
+            let savedStories = getSavedStories();
+            const story = savedStories.find(s => s.id === storyId);
+            if (story) {
+                if (!story.tags) story.tags = [];
+                if (!story.tags.includes(tag)) {
+                    story.tags.push(tag);
+                    localStorage.setItem(SAVED_STORIES_KEY, JSON.stringify(savedStories));
+                    renderStoryTags(storyId);
+                }
+            }
+        }
+
+        function removeTagFromStory(storyId, tag) {
+            let savedStories = getSavedStories();
+            const story = savedStories.find(s => s.id === storyId);
+            if (story && story.tags) {
+                story.tags = story.tags.filter(t => t !== tag);
+                localStorage.setItem(SAVED_STORIES_KEY, JSON.stringify(savedStories));
+                renderStoryTags(storyId);
+            }
+        }
+
+        function renderStoryTags(storyId) {
+            const savedStories = getSavedStories();
+            const story = savedStories.find(s => s.id === storyId);
+            storyTags.innerHTML = '';
+            if (story && story.tags) {
+                story.tags.forEach(tag => {
+                    const tagEl = document.createElement('span');
+                    tagEl.className = 'story-tag';
+                    tagEl.dataset.tag = tag;
+                    tagEl.innerHTML = `${tag} <span class="remove-tag" title="Remove tag">&times;</span>`;
+                    storyTags.appendChild(tagEl);
+                });
+            }
+        }
+
+        function renderTagFilters() {
+            const savedStories = getSavedStories();
+            const allTags = new Set();
+            savedStories.forEach(story => {
+                if (story.tags) {
+                    story.tags.forEach(tag => allTags.add(tag));
+                }
+            });
+
+            tagsContainer.innerHTML = '';
+            if (allTags.size > 0) {
+                savedTagsFilter.style.display = 'block';
+                
+                // "All" button
+                const allBtn = document.createElement('button');
+                allBtn.className = 'tag-filter-button';
+                allBtn.textContent = 'All';
+                if (activeTagFilter === null) allBtn.classList.add('active');
+                allBtn.onclick = () => {
+                    activeTagFilter = null;
+                    displaySavedStories();
+                };
+                tagsContainer.appendChild(allBtn);
+
+                // Individual tag buttons
+                [...allTags].sort().forEach(tag => {
+                    const tagBtn = document.createElement('button');
+                    tagBtn.className = 'tag-filter-button';
+                    tagBtn.textContent = tag;
+                    if (tag === activeTagFilter) tagBtn.classList.add('active');
+                    tagBtn.onclick = () => {
+                        activeTagFilter = activeTagFilter === tag ? null : tag;
+                        displaySavedStories();
+                    };
+                    tagsContainer.appendChild(tagBtn);
+                });
+
+            } else {
+                savedTagsFilter.style.display = 'none';
+            }
         }
 
         // --- Reading Position Functions ---
@@ -1810,6 +1944,112 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
+        // --- Live Comments Functions ---
+        function toggleLiveComments(e) {
+            const btn = e.target;
+            if (liveCommentsInterval) {
+                clearInterval(liveCommentsInterval);
+                liveCommentsInterval = null;
+                btn.classList.remove('active');
+                btn.textContent = 'Live Comments';
+                showToast('Live comments stopped.');
+            } else {
+                fetchNewComments(); // Fetch immediately, then start interval
+                liveCommentsInterval = setInterval(fetchNewComments, 30000); // 30 seconds
+                btn.classList.add('active');
+                btn.textContent = 'Live (Stop)';
+                showToast('Live comments started. New comments will be highlighted.');
+            }
+        }
+
+        async function fetchNewComments() {
+            if (!currentStoryId) return;
+
+            const story = allFetchedPosts.find(p => p.id === currentStoryId) || getHistory().find(p => p.id === currentStoryId) || getSavedStories().find(p => p.id === currentStoryId);
+            if (!story) return;
+
+            try {
+                const commentsUrl = `${REDDIT_API_BASE_URL}r/${story.subreddit}/comments/${story.id}.json?sort=new&limit=25`;
+                const response = await fetch(commentsUrl);
+                if (!response.ok) return; // Fail silently
+                const data = await response.json();
+                const newComments = data[1].data.children.filter(c => c.kind === 't1');
+                
+                const commentSection = document.getElementById('comment-section');
+                if (!commentSection) return;
+
+                const existingCommentIds = new Set([...commentSection.querySelectorAll('.comment-card')].map(c => c.dataset.commentId));
+                const uniqueNewComments = newComments.filter(c => !existingCommentIds.has(c.data.id));
+
+                if (uniqueNewComments.length > 0) {
+                    const opAuthor = commentSection.dataset.opAuthor;
+                    const commentsHTML = uniqueNewComments.map(c => c.data).map(c => {
+                        const isOp = c.author === opAuthor;
+                        const opClass = isOp ? 'op-comment' : '';
+                        const opLabel = isOp ? '<span class="op-label">OP</span>' : '';
+                        return `
+                        <div class="comment-card ${opClass} new-comment-highlight" data-comment-id="${c.id}" data-comment-author="${c.author}">
+                            <p class="comment-author"><span class="collapse-comment">[–]</span><a href="#" class="author-link">u/${c.author}</a> ${opLabel}</p>
+                            <div class="comment-body markdown-content">${renderMarkdown(c.body)}</div>
+                        </div>`
+                    }).join('');
+
+                    commentSection.insertAdjacentHTML('afterbegin', commentsHTML);
+                }
+            } catch(e) {
+                console.error("Failed to fetch live comments:", e);
+                // Fail silently
+            }
+        }
+        
+        // --- Quick Look Functions ---
+        function handleQuickLook(e) {
+            const card = e.target.closest('.story-card');
+            if (card) {
+                clearTimeout(quickLookTimeout);
+                quickLookTimeout = setTimeout(() => {
+                    showQuickLook(card);
+                    positionQuickLook(e);
+                }, 300); // 300ms delay before showing
+            }
+        }
+        
+        function showQuickLook(card) {
+            const storyId = card.dataset.storyId;
+            const story = allFetchedPosts.find(p => p.id === storyId);
+            if (!story || !story.selftext) return; // Don't show for stories without text
+
+            quickLookPopup.innerHTML = `
+                <h4>${story.title}</h4>
+                <p>${story.selftext}</p>
+            `;
+            quickLookPopup.classList.add('visible');
+        }
+
+        function hideQuickLook() {
+            clearTimeout(quickLookTimeout);
+             quickLookPopup.classList.remove('visible');
+        }
+
+        function positionQuickLook(e) {
+            const offsetX = 20;
+            const offsetY = 20;
+            let x = e.clientX + offsetX;
+            let y = e.clientY + offsetY;
+            
+            // Prevent going off-screen
+            if (x + quickLookPopup.offsetWidth > window.innerWidth) {
+                x = e.clientX - quickLookPopup.offsetWidth - offsetX;
+            }
+            if (y + quickLookPopup.offsetHeight > window.innerHeight) {
+                y = e.clientY - quickLookPopup.offsetHeight - offsetY;
+            }
+            
+            quickLookPopup.style.left = `${x}px`;
+            quickLookPopup.style.top = `${y}px`;
+        }
+
+
         // --- Utility Functions ---
         function debounce(func, delay) {
             let timeout;
@@ -1826,4 +2066,5 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.innerHTML = "<h1>A critical error occurred. Please refresh the page.</h1>";
     }
 });
+
 
