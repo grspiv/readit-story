@@ -18,6 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const timeRangeControls = document.getElementById('time-range-controls');
         const timeRangeSelect = document.getElementById('time-range-select');
         const viewSavedButton = document.getElementById('view-saved-button');
+        const viewHistoryButton = document.getElementById('view-history-button');
         const storiesHeading = document.getElementById('stories-heading');
         const controlsSection = document.querySelector('.controls');
         const clearSavedButton = document.getElementById('clear-saved-button');
@@ -29,6 +30,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const filterSection = document.getElementById('filter-section');
         const savedSortSection = document.getElementById('saved-sort-section');
         const savedSortSelect = document.getElementById('saved-sort-select');
+        const historySortSection = document.getElementById('history-sort-section');
+        const historySortSelect = document.getElementById('history-sort-select');
+        const clearHistoryContainer = document.getElementById('clear-history-container');
+        const clearHistoryButton = document.getElementById('clear-history-button');
         const toastNotification = document.getElementById('toast-notification');
         const layoutToggleButton = document.getElementById('layout-toggle-button');
         const galleryToggleButton = document.getElementById('gallery-toggle-button');
@@ -40,15 +45,16 @@ document.addEventListener('DOMContentLoaded', () => {
         // --- Constants & State ---
         const REDDIT_API_BASE_URL = 'https://www.reddit.com/r/';
         const SAVED_STORIES_KEY = 'redditStorytellerSaved';
-        const READ_STORIES_KEY = 'redditStorytellerRead';
-        const SUBREDDIT_HISTORY_KEY = 'redditStorytellerHistory';
+        const READ_HISTORY_KEY = 'redditStorytellerHistory';
+        const SUBREDDIT_HISTORY_KEY = 'redditSubredditHistory';
         const LAYOUT_PREFERENCE_KEY = 'redditStorytellerLayout';
         const GALLERY_PREFERENCE_KEY = 'redditStorytellerGallery';
         const NSFW_PREFERENCE_KEY = 'redditStorytellerNSFW';
         const READING_SETTINGS_KEY = 'redditStorytellerReading';
         const RANDOM_SUBREDDITS = ['nosleep', 'LetsNotMeet', 'glitch_in_the_matrix', 'tifu', 'confession', 'maliciouscompliance', 'talesfromtechsupport', 'WritingPrompts', 'shortscarystories', 'UnresolvedMysteries'];
+        
+        let currentView = 'browsing'; // browsing, saved, history
         let currentAfterToken = null;
-        let isShowingSaved = false;
         let allFetchedPosts = [];
         let currentSearchQuery = '';
         let isLoadingMore = false;
@@ -74,15 +80,18 @@ document.addEventListener('DOMContentLoaded', () => {
         layoutToggleButton.addEventListener('click', handleLayoutToggle);
         galleryToggleButton.addEventListener('click', handleGalleryToggle);
         nsfwToggle.addEventListener('change', () => applyNSFWPreference(nsfwToggle.checked, true));
-        fetchButton.addEventListener('click', handleFetchClick);
+        fetchButton.addEventListener('click', () => switchToView('browsing', { refresh: true }));
         randomButton.addEventListener('click', handleRandomClick);
         sortSelect.addEventListener('change', handleSortChange);
-        viewSavedButton.addEventListener('click', handleViewSavedClick);
+        viewSavedButton.addEventListener('click', () => switchToView('saved'));
+        viewHistoryButton.addEventListener('click', () => switchToView('history'));
         clearSavedButton.addEventListener('click', handleClearSaved);
+        clearHistoryButton.addEventListener('click', handleClearHistory);
         exportSavedButton.addEventListener('click', handleExportSaved);
         importSavedButton.addEventListener('click', () => importFileInput.click());
         importFileInput.addEventListener('change', handleImportFile);
         savedSortSelect.addEventListener('change', displaySavedStories);
+        historySortSelect.addEventListener('change', displayHistory);
         flairFilterInput.addEventListener('input', () => renderFilteredStories());
         closePopupButton.addEventListener('click', closePopup);
         popupOverlay.addEventListener('click', (e) => e.target === popupOverlay && closePopup());
@@ -90,6 +99,50 @@ document.addEventListener('DOMContentLoaded', () => {
         backToTopButton.addEventListener('click', scrollToTop);
         document.addEventListener('keydown', handleKeyboardNav);
         popupBody.addEventListener('click', handlePopupBodyClick);
+
+        // --- Main View Controller ---
+        function switchToView(view, options = {}) {
+            if (view === currentView && view !== 'browsing') {
+                switchToView('browsing', { refresh: true });
+                return;
+            }
+
+            currentView = view;
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+
+            // Hide all view-specific sections
+            [controlsSection, filterSection, savedSortSection, clearSavedContainer, historySortSection, clearHistoryContainer].forEach(el => el.style.display = 'none');
+            [viewSavedButton, viewHistoryButton].forEach(btn => btn.classList.remove('active'));
+
+            if (view === 'browsing') {
+                controlsSection.style.display = 'flex';
+                viewSavedButton.textContent = 'Saved Stories';
+                viewHistoryButton.textContent = 'History';
+                if (options.refresh) {
+                    const subreddit = subredditInput.value.trim();
+                    const sort = sortSelect.value;
+                    const timeRange = timeRangeSelect.value;
+                    currentSearchQuery = searchInput.value.trim();
+                    if (subreddit) {
+                        fetchStories(subreddit, sort, timeRange, false, currentSearchQuery);
+                    } else {
+                        showErrorPopup("Please enter a subreddit name.");
+                    }
+                }
+            } else if (view === 'saved') {
+                savedSortSection.style.display = 'flex';
+                viewSavedButton.textContent = 'Back to Browsing';
+                viewSavedButton.classList.add('active');
+                viewHistoryButton.textContent = 'History';
+                displaySavedStories();
+            } else if (view === 'history') {
+                historySortSection.style.display = 'flex';
+                viewHistoryButton.textContent = 'Back to Browsing';
+                viewHistoryButton.classList.add('active');
+                viewSavedButton.textContent = 'Saved Stories';
+                displayHistory();
+            }
+        }
 
         // --- Functions ---
         function applyTheme(theme) {
@@ -144,33 +197,11 @@ document.addEventListener('DOMContentLoaded', () => {
             localStorage.setItem(GALLERY_PREFERENCE_KEY, isGallery);
         }
 
-
-        function handleFetchClick() {
-            isShowingSaved = false;
-            viewSavedButton.textContent = 'Saved Stories';
-            viewSavedButton.classList.remove('active');
-            controlsSection.style.display = 'flex';
-            clearSavedContainer.style.display = 'none';
-            savedSortSection.style.display = 'none';
-
-
-            const subreddit = subredditInput.value.trim();
-            const sort = sortSelect.value;
-            const timeRange = timeRangeSelect.value;
-            currentSearchQuery = searchInput.value.trim();
-
-            if (subreddit) {
-                fetchStories(subreddit, sort, timeRange, false, currentSearchQuery);
-            } else {
-                showErrorPopup("Please enter a subreddit name.");
-            }
-        }
-        
         function handleRandomClick() {
             const randomSub = RANDOM_SUBREDDITS[Math.floor(Math.random() * RANDOM_SUBREDDITS.length)];
             subredditInput.value = randomSub;
             searchInput.value = '';
-            handleFetchClick();
+            switchToView('browsing', { refresh: true });
         }
 
         function handleLoadMore() {
@@ -189,28 +220,6 @@ document.addEventListener('DOMContentLoaded', () => {
             timeRangeControls.style.display = isTop || (isSearch && sortSelect.value === 'top') ? 'flex' : 'none';
         }
 
-        function handleViewSavedClick() {
-            if (isShowingSaved) {
-                handleFetchClick();
-            } else {
-                isShowingSaved = true;
-                displaySavedStories();
-                viewSavedButton.textContent = 'Back to Browsing';
-                viewSavedButton.classList.add('active');
-                controlsSection.style.display = 'none';
-                filterSection.style.display = 'none';
-                savedSortSection.style.display = 'flex';
-                galleryToggleButton.style.display = 'none';
-            }
-        }
-        
-        function handleClearSaved() {
-            if (confirm("Are you sure you want to delete all saved stories? This cannot be undone.")) {
-                localStorage.removeItem(SAVED_STORIES_KEY);
-                displaySavedStories();
-            }
-        }
-
         function closePopup() {
             window.speechSynthesis.cancel();
             popupOverlay.classList.remove('active');
@@ -223,7 +232,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const shouldShow = document.body.scrollTop > 100 || document.documentElement.scrollTop > 100;
             backToTopButton.style.display = shouldShow ? "flex" : "none";
             
-            if (!isLoadingMore && !isShowingSaved && currentAfterToken) {
+            if (!isLoadingMore && currentView === 'browsing' && currentAfterToken) {
                  if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 500) {
                     handleLoadMore();
                 }
@@ -310,7 +319,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         async function fetchAndShowComments(story) {
             currentStoryId = story.id;
-            addStoryToRead(story.id);
+            addStoryToHistory(story);
             const storyCard = storyContainer.querySelector(`.story-card[data-story-id="${story.id}"]`);
             if(storyCard) storyCard.classList.add('read');
 
@@ -404,7 +413,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         async function fetchCommentsForCurrentStory(sort) {
-            const story = allFetchedPosts.find(p => p.id === currentStoryId);
+            const story = allFetchedPosts.find(p => p.id === currentStoryId) || getHistory().find(p => p.id === currentStoryId) || getSavedStories().find(p => p.id === currentStoryId);
             if (!story) return;
 
             const commentSection = document.getElementById('comment-section');
@@ -417,7 +426,13 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const commentsUrl = `${REDDIT_API_BASE_URL}${story.subreddit}/comments/${story.id}.json?sort=${sort}`;
                 const response = await fetch(commentsUrl);
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                if (!response.ok) {
+                    let errorText = `HTTP error! status: ${response.status}`;
+                    if (response.status === 403) {
+                        errorText = "Comments for this post are unavailable (possibly due to being from a private or quarantined subreddit)."
+                    }
+                    throw new Error(errorText);
+                }
                 const data = await response.json();
                 const comments = data[1].data.children;
                 
@@ -427,7 +442,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch (error) {
                 console.error(`Failed to fetch comments sorted by ${sort}:`, error);
                  const currentCommentSection = document.getElementById('comment-section');
-                currentCommentSection.innerHTML = `<p>Could not load comments.</p>`;
+                currentCommentSection.innerHTML = `<p>${error.message}</p>`;
             }
         }
 
@@ -500,12 +515,14 @@ document.addEventListener('DOMContentLoaded', () => {
         
         function renderFilteredStories() {
             const flairFilter = flairFilterInput.value.trim().toLowerCase();
-            const readStories = getReadStories();
+            const readStories = getHistory().map(h => h.id);
 
             storyContainer.querySelectorAll('.story-card').forEach(card => {
                 const storyId = card.dataset.storyId;
                 const story = allFetchedPosts.find(p => p.id === storyId);
                 
+                if (!story) return;
+
                 const flairMatch = !flairFilter || (story.link_flair_text && story.link_flair_text.toLowerCase().includes(flairFilter));
                 card.style.display = flairMatch ? 'flex' : 'none';
 
@@ -521,16 +538,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
 
-        function displayStories(stories) {
+        function displayStories(stories, options = {}) {
             const shouldBlur = nsfwToggle.checked;
-            const readStories = getReadStories();
 
             stories.forEach((story, index) => {
                 const storyCard = document.createElement('div');
                 storyCard.className = 'story-card';
                 storyCard.dataset.storyId = story.id;
                 
-                if (readStories.includes(story.id)) {
+                if (isStoryRead(story.id)) {
                     storyCard.classList.add('read');
                 }
 
@@ -543,6 +559,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 const readingTime = calculateReadingTime(story.selftext);
                 const timeAgo = formatTimeAgo(story.created_utc);
                 const isSensitive = story.over_18 || story.spoiler;
+                
+                let readAtTimeHTML = '';
+                if (options.isHistoryView && story.readAt) {
+                    readAtTimeHTML = `<p class="read-at-time">Read ${formatTimeAgo(new Date(story.readAt).getTime() / 1000)}</p>`;
+                }
 
                 if (shouldBlur && isSensitive) {
                     storyCard.classList.add('nsfw-blur');
@@ -570,13 +591,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="story-card-content">
                         ${crosspostHTML}
                         <div class="story-meta">
-                            <span><svg viewBox="0 0 24 24"><path d="M12 2L2 12h5v10h10V12h5L12 2z"/></svg>${story.score.toLocaleString()}</span>
-                            <span><svg viewBox="0 0 24 24"><path d="M21.99 4c0-1.1-.89-2-1.99-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14l4 4-.01-18z"/></svg>${story.num_comments.toLocaleString()}</span>
-                            <span><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>${timeAgo}</span>
+                            <span><svg width="24" height="24" viewBox="0 0 24 24"><path d="M12 2L2 12h5v10h10V12h5L12 2z"/></svg>${(story.score || 0).toLocaleString()}</span>
+                            <span><svg width="24" height="24" viewBox="0 0 24 24"><path d="M21.99 4c0-1.1-.89-2-1.99-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14l4 4-.01-18z"/></svg>${(story.num_comments || 0).toLocaleString()}</span>
+                            <span><svg width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>${timeAgo}</span>
                             ${story.link_flair_text ? `<span class="story-flair">${story.link_flair_text}</span>` : ''}
                         </div>
                         <h3><a href="${redditLink}" target="_blank" rel="noopener noreferrer">${story.title}</a></h3>
                         <p class="author" title="Find all posts by this author">by u/${story.author}</p>
+                        ${readAtTimeHTML}
                         <p class="reading-time">${readingTime}</p>
                         <p class="preview">${story.selftext ? story.selftext.substring(0, 150) + '...' : ''}</p>
                         <div class="story-card-actions">
@@ -618,7 +640,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     crosspostLink.addEventListener('click', (e) => {
                         e.stopPropagation();
                         subredditInput.value = e.target.dataset.subreddit;
-                        handleFetchClick();
+                        switchToView('browsing', { refresh: true });
                     });
                 }
                 
@@ -695,25 +717,77 @@ document.addEventListener('DOMContentLoaded', () => {
         
         function handleAuthorClick(author) {
             searchInput.value = `author:${author}`;
-            handleFetchClick();
+            switchToView('browsing', { refresh: true });
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
         
-        // --- Saved & Read Stories, History Functions ---
-        function getReadStories() {
-            return JSON.parse(localStorage.getItem(READ_STORIES_KEY)) || [];
+        // --- Saved & History Functions ---
+        function getHistory() {
+            const history = JSON.parse(localStorage.getItem(READ_HISTORY_KEY)) || [];
+            return history.filter(story => story && story.id && story.title);
         }
 
-        function addStoryToRead(storyId) {
-            let readStories = getReadStories();
-            if (!readStories.includes(storyId)) {
-                readStories.push(storyId);
-                localStorage.setItem(READ_STORIES_KEY, JSON.stringify(readStories));
+        function addStoryToHistory(story) {
+            if (!story || !story.id) return;
+            let history = getHistory();
+            const storyIndex = history.findIndex(s => s.id === story.id);
+            if (storyIndex > -1) {
+                history.splice(storyIndex, 1);
             }
+            history.unshift({ ...story, readAt: new Date().toISOString() });
+            history = history.slice(0, 200); // Keep history to a reasonable size
+            localStorage.setItem(READ_HISTORY_KEY, JSON.stringify(history));
         }
 
         function isStoryRead(storyId) {
-            return getReadStories().includes(storyId);
+            return getHistory().some(s => s.id === storyId);
+        }
+
+        function displayHistory() {
+            storyContainer.innerHTML = '';
+            
+            let history = getHistory();
+            const sortMethod = historySortSelect.value;
+            
+            switch (sortMethod) {
+                case 'date-desc':
+                    history.sort((a, b) => new Date(b.readAt) - new Date(a.readAt));
+                    break;
+                case 'date-asc':
+                    history.sort((a, b) => new Date(a.readAt) - new Date(b.readAt));
+                    break;
+                case 'score-desc':
+                    history.sort((a, b) => b.score - a.score);
+                    break;
+                case 'subreddit-az':
+                    history.sort((a, b) => a.subreddit.localeCompare(b.subreddit));
+                    break;
+            }
+
+            storiesHeading.textContent = `You have read ${history.length} stor${history.length === 1 ? 'y' : 'ies'}`;
+            
+            if (history.length > 0) {
+                clearHistoryContainer.style.display = 'flex';
+                displayStories(history, { isHistoryView: true });
+            } else {
+                clearHistoryContainer.style.display = 'none';
+                storyContainer.innerHTML = `<p class="empty-state">You haven't read any stories yet.</p>`;
+            }
+        }
+        
+        function handleClearHistory() {
+            if (confirm("Are you sure you want to clear your reading history? This cannot be undone.")) {
+                localStorage.removeItem(READ_HISTORY_KEY);
+                displayHistory();
+                renderFilteredStories();
+            }
+        }
+        
+         function handleClearSaved() {
+            if (confirm("Are you sure you want to delete all saved stories? This cannot be undone.")) {
+                localStorage.removeItem(SAVED_STORIES_KEY);
+                displaySavedStories();
+            }
         }
 
         function toggleSaveStory(event, story) {
@@ -732,7 +806,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 button.classList.add('saved');
             }
             localStorage.setItem(SAVED_STORIES_KEY, JSON.stringify(savedStories));
-            if (isShowingSaved) displaySavedStories();
+            if (currentView === 'saved') displaySavedStories();
         }
         
         function getSavedStories() {
@@ -764,12 +838,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     break;
             }
 
-            allFetchedPosts = savedStories;
-            storiesHeading.textContent = `You have ${allFetchedPosts.length} saved stor${allFetchedPosts.length === 1 ? 'y' : 'ies'}`;
+            storiesHeading.textContent = `You have ${savedStories.length} saved stor${savedStories.length === 1 ? 'y' : 'ies'}`;
             
-            if (allFetchedPosts.length > 0) {
+            if (savedStories.length > 0) {
                 clearSavedContainer.style.display = 'flex';
-                displayStories(allFetchedPosts);
+                displayStories(savedStories);
             } else {
                 clearSavedContainer.style.display = 'none';
                 storyContainer.innerHTML = `<p class="empty-state">You haven't saved any stories yet.</p>`;
@@ -818,7 +891,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     localStorage.setItem(SAVED_STORIES_KEY, JSON.stringify(existingStories));
                     showToast(`Successfully imported ${newStoriesCount} new stories!`);
-                    if (isShowingSaved) displaySavedStories();
+                    if (currentView === 'saved') displaySavedStories();
 
                 } catch (error) {
                     showErrorPopup("Import failed. The file is either corrupted or not in the correct format.");

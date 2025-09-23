@@ -83,6 +83,7 @@
 
         <section class="action-bar">
             <button id="view-saved-button" class="action-button secondary">Saved Stories</button>
+            <button id="view-history-button" class="action-button secondary">History</button>
             <div id="saved-sort-section" style="display: none;">
                 <div class="input-group">
                     <label for="saved-sort-select">Sort Saved By:</label>
@@ -94,11 +95,25 @@
                     </select>
                 </div>
             </div>
-            <div id="clear-saved-container" style="display: none;">
+            <div id="history-sort-section" style="display: none;">
+                 <div class="input-group">
+                    <label for="history-sort-select">Sort History By:</label>
+                    <select id="history-sort-select" class="dropdown-input">
+                        <option value="date-desc">Date Read (Newest)</option>
+                        <option value="date-asc">Date Read (Oldest)</option>
+                        <option value="score-desc">Score</option>
+                        <option value="subreddit-az">Subreddit (A-Z)</option>
+                    </select>
+                </div>
+            </div>
+            <div id="clear-saved-container" style="display: none;" class="action-bar-group">
                  <button id="export-saved-button" class="action-button secondary">Export</button>
                  <button id="import-saved-button" class="action-button secondary">Import</button>
                  <input type="file" id="import-file-input" accept=".json" style="display:none;">
                  <button id="clear-saved-button" class="action-button danger">Clear All Saved</button>
+            </div>
+             <div id="clear-history-container" style="display: none;" class="action-bar-group">
+                 <button id="clear-history-button" class="action-button danger">Clear History</button>
             </div>
         </section>
 

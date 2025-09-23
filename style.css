@@ -130,6 +130,12 @@ body {
     gap: 15px;
     margin-bottom: 30px;
 }
+.action-bar-group {
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
 
 .input-group {
     display: flex;
@@ -368,10 +374,14 @@ body {
     color: var(--highlight-color);
 }
 
-.reading-time {
+.reading-time, .read-at-time {
     font-size: 0.8em;
     color: #aaa;
     margin: 0 0 15px;
+}
+.read-at-time {
+    font-weight: bold;
+    color: var(--accent-color);
 }
 
 
