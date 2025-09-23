@@ -41,6 +41,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const layoutIconList = document.getElementById('layout-icon-list');
         const nsfwToggle = document.getElementById('nsfw-toggle');
         const infiniteScrollLoader = document.getElementById('infinite-scroll-loader');
+        const subredditInfoPanel = document.getElementById('subreddit-info-panel');
+        const clearSearchButton = document.getElementById('clear-search-button');
+        const galleryPrevButton = document.getElementById('gallery-prev');
+        const galleryNextButton = document.getElementById('gallery-next');
+
 
         // --- Constants & State ---
         const REDDIT_API_BASE_URL = 'https://www.reddit.com/r/';
@@ -59,6 +64,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let currentSearchQuery = '';
         let isLoadingMore = false;
         let currentStoryId = null;
+        let currentUtterance = null;
 
         // --- Initialization ---
         const savedTheme = localStorage.getItem('theme') || 'light';
@@ -93,6 +99,15 @@ document.addEventListener('DOMContentLoaded', () => {
         savedSortSelect.addEventListener('change', displaySavedStories);
         historySortSelect.addEventListener('change', displayHistory);
         flairFilterInput.addEventListener('input', () => renderFilteredStories());
+        searchInput.addEventListener('input', () => {
+            clearSearchButton.style.display = searchInput.value ? 'block' : 'none';
+        });
+        clearSearchButton.addEventListener('click', () => {
+            searchInput.value = '';
+            clearSearchButton.style.display = 'none';
+        });
+        galleryPrevButton.addEventListener('click', () => navigateGallery(-1));
+        galleryNextButton.addEventListener('click', () => navigateGallery(1));
         closePopupButton.addEventListener('click', closePopup);
         popupOverlay.addEventListener('click', (e) => e.target === popupOverlay && closePopup());
         window.addEventListener('scroll', handleScroll);
@@ -111,7 +126,7 @@ document.addEventListener('DOMContentLoaded', () => {
             window.scrollTo({ top: 0, behavior: 'smooth' });
 
             // Hide all view-specific sections
-            [controlsSection, filterSection, savedSortSection, clearSavedContainer, historySortSection, clearHistoryContainer].forEach(el => el.style.display = 'none');
+            [controlsSection, filterSection, savedSortSection, clearSavedContainer, historySortSection, clearHistoryContainer, subredditInfoPanel].forEach(el => el.style.display = 'none');
             [viewSavedButton, viewHistoryButton].forEach(btn => btn.classList.remove('active'));
 
             if (view === 'browsing') {
@@ -226,6 +241,8 @@ document.addEventListener('DOMContentLoaded', () => {
             document.body.style.overflow = 'auto';
             const video = popupBody.querySelector('video');
             if (video) video.pause();
+            galleryPrevButton.style.display = 'none';
+            galleryNextButton.style.display = 'none';
         }
 
         function handleScroll() {
@@ -240,8 +257,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         function scrollToTop() {
-            document.body.scrollTop = 0;
-            document.documentElement.scrollTop = 0;
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
         
         function showErrorPopup(message) {
@@ -268,16 +284,46 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
+        async function fetchSubredditInfo(subreddit) {
+            try {
+                const response = await fetch(`${REDDIT_API_BASE_URL}${subreddit}/about.json`);
+                if (!response.ok) throw new Error('Could not fetch subreddit info.');
+                const data = await response.json();
+                const info = data.data;
+
+                subredditInfoPanel.innerHTML = `
+                    <img src="${info.community_icon || info.icon_img || 'https://placehold.co/60x60/e74c3c/fff?text=R'}" alt="Subreddit Icon" class="subreddit-icon">
+                    <div class="subreddit-details">
+                        <div class="subreddit-info-header">
+                            <h3 class="subreddit-title">${info.display_name_prefixed}</h3>
+                            <span class="subreddit-stats">${(info.subscribers || 0).toLocaleString()} members</span>
+                        </div>
+                        <p class="subreddit-description">${renderMarkdown(info.public_description)}</p>
+                    </div>
+                `;
+                subredditInfoPanel.style.display = 'flex';
+            } catch (error) {
+                console.error("Failed to display subreddit info:", error);
+                subredditInfoPanel.style.display = 'none';
+            }
+        }
+
         async function fetchStories(subreddit, sort, timeRange = 'all', loadMore = false, query = '') {
             if (isLoadingMore) return;
             isLoadingMore = true;
 
             if (!loadMore) {
+                scrollToTop();
                 if (!subreddit.includes('+') && !query.toLowerCase().startsWith('author:')) saveSubredditToHistory(subreddit);
                 allFetchedPosts = [];
                 currentAfterToken = null;
                 flairFilterInput.value = '';
                 storyContainer.innerHTML = '';
+                 if (!subreddit.includes('+') && !query) {
+                    fetchSubredditInfo(subreddit);
+                } else {
+                    subredditInfoPanel.style.display = 'none';
+                }
             }
             
             showLoading(true, loadMore);
@@ -323,13 +369,22 @@ document.addEventListener('DOMContentLoaded', () => {
             const storyCard = storyContainer.querySelector(`.story-card[data-story-id="${story.id}"]`);
             if(storyCard) storyCard.classList.add('read');
 
+            const popupSubredditLink = document.getElementById('popup-subreddit-link');
+            popupSubredditLink.innerHTML = `<a href="#">${story.subreddit_name_prefixed}</a>`;
+            popupSubredditLink.querySelector('a').addEventListener('click', (e) => {
+                e.preventDefault();
+                closePopup();
+                subredditInput.value = story.subreddit;
+                switchToView('browsing', { refresh: true });
+            });
+
+
             popupTitle.textContent = story.title;
-            const header = popupTitle.parentElement;
+            const header = popupTitle.parentElement.parentElement;
             
             popupControls.innerHTML = `
                 <div class="popup-actions-left">
-                    <button id="read-aloud-button" class="action-button secondary">Read Aloud</button>
-                    <button id="stop-reading-button" class="action-button" style="display:none;">Stop</button>
+                    <button id="read-aloud-toggle" class="action-button secondary">Read Aloud</button>
                 </div>
                 <div class="popup-actions-right">
                      <div class="reading-controls">
@@ -390,6 +445,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
             document.body.style.overflow = 'hidden';
             popupOverlay.classList.add('active');
+            
+            if (storyContainer.classList.contains('gallery-view')) {
+                galleryPrevButton.style.display = 'block';
+                galleryNextButton.style.display = 'block';
+            }
             
             let storyText = story.selftext || '';
             if (currentSearchQuery) {
@@ -565,6 +625,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     readAtTimeHTML = `<p class="read-at-time">Read ${formatTimeAgo(new Date(story.readAt).getTime() / 1000)}</p>`;
                 }
 
+                let gildedHTML = '';
+                if (story.total_awards_received > 0) {
+                    gildedHTML = `<span><svg class="gilded-icon" width="24" height="24" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>${story.total_awards_received}</span>`;
+                }
+
                 if (shouldBlur && isSensitive) {
                     storyCard.classList.add('nsfw-blur');
                     const uncoverDiv = document.createElement('div');
@@ -594,12 +659,13 @@ document.addEventListener('DOMContentLoaded', () => {
                             <span><svg width="24" height="24" viewBox="0 0 24 24"><path d="M12 2L2 12h5v10h10V12h5L12 2z"/></svg>${(story.score || 0).toLocaleString()}</span>
                             <span><svg width="24" height="24" viewBox="0 0 24 24"><path d="M21.99 4c0-1.1-.89-2-1.99-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14l4 4-.01-18z"/></svg>${(story.num_comments || 0).toLocaleString()}</span>
                             <span><svg width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>${timeAgo}</span>
+                             ${gildedHTML}
                             ${story.link_flair_text ? `<span class="story-flair">${story.link_flair_text}</span>` : ''}
                         </div>
                         <h3><a href="${redditLink}" target="_blank" rel="noopener noreferrer">${story.title}</a></h3>
                         <p class="author" title="Find all posts by this author">by u/${story.author}</p>
                         ${readAtTimeHTML}
-                        <p class="reading-time">${readingTime}</p>
+                        <p class="reading-time">${readingTime} (${(story.selftext || '').split(/\s+/).length} words)</p>
                         <p class="preview">${story.selftext ? story.selftext.substring(0, 150) + '...' : ''}</p>
                         <div class="story-card-actions">
                             <button class="read-button">Read Story</button>
@@ -951,19 +1017,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         function setupReadingControls(story) {
-            const readAloudButton = document.getElementById('read-aloud-button');
-            const stopReadingButton = document.getElementById('stop-reading-button');
+            const readAloudToggle = document.getElementById('read-aloud-toggle');
             const fontSizeUp = document.getElementById('font-size-up');
             const fontSizeDown = document.getElementById('font-size-down');
             const lineHeightUp = document.getElementById('line-height-up');
             const lineHeightDown = document.getElementById('line-height-down');
             
-            readAloudButton.addEventListener('click', () => handleReadAloud(story));
-            stopReadingButton.addEventListener('click', () => {
-                window.speechSynthesis.cancel();
-                readAloudButton.style.display = 'inline-block';
-                stopReadingButton.style.display = 'none';
-            });
+            readAloudToggle.addEventListener('click', () => handleReadAloudClick(story));
 
             fontSizeUp.addEventListener('click', () => updateReadingSetting('fontSize', 0.1));
             fontSizeDown.addEventListener('click', () => updateReadingSetting('fontSize', -0.1));
@@ -971,36 +1031,44 @@ document.addEventListener('DOMContentLoaded', () => {
             lineHeightDown.addEventListener('click', () => updateReadingSetting('lineHeight', -0.1));
         }
 
-        function handleReadAloud(story) {
-            const readAloudButton = document.getElementById('read-aloud-button');
-            const stopReadingButton = document.getElementById('stop-reading-button');
-            window.speechSynthesis.cancel();
-            let textToRead = `Title: ${story.title}. By user ${story.author}. ${story.selftext}. `;
-            const comments = popupBody.querySelectorAll('.comment-card');
-            if (comments.length > 0) {
-                textToRead += " Now for the top comments. ";
-                comments.forEach(comment => {
-                    const author = comment.dataset.commentAuthor;
-                    const body = comment.querySelector('.comment-body').textContent;
-                    textToRead += `Comment from user ${author}. ${body}. `;
-                });
+        function handleReadAloudClick(story) {
+            const toggleBtn = document.getElementById('read-aloud-toggle');
+            if (speechSynthesis.paused && currentUtterance) {
+                speechSynthesis.resume();
+            } else if (speechSynthesis.speaking && currentUtterance) {
+                speechSynthesis.pause();
+            } else {
+                speechSynthesis.cancel(); // Clear queue
+                let textToRead = `Title: ${story.title}. By user ${story.author}. ${story.selftext}. `;
+                const comments = popupBody.querySelectorAll('.comment-card');
+                if (comments.length > 0) {
+                    textToRead += " Now for the top comments. ";
+                    comments.forEach(comment => {
+                        if (comment.classList.contains('collapsed')) return;
+                        const author = comment.dataset.commentAuthor;
+                        const body = comment.querySelector('.comment-body').textContent;
+                        textToRead += `Comment from user ${author}. ${body}. `;
+                    });
+                }
+                
+                currentUtterance = new SpeechSynthesisUtterance(textToRead);
+                
+                currentUtterance.onstart = () => { toggleBtn.textContent = 'Pause'; };
+                currentUtterance.onpause = () => { toggleBtn.textContent = 'Resume'; };
+                currentUtterance.onresume = () => { toggleBtn.textContent = 'Pause'; };
+                currentUtterance.onend = () => {
+                    toggleBtn.textContent = 'Read Aloud';
+                    currentUtterance = null;
+                };
+                currentUtterance.onerror = (event) => {
+                    console.error('Speech synthesis error:', event.error);
+                    showToast('Sorry, text-to-speech is not available.');
+                    toggleBtn.textContent = 'Read Aloud';
+                    currentUtterance = null;
+                };
+                
+                speechSynthesis.speak(currentUtterance);
             }
-            const utterance = new SpeechSynthesisUtterance(textToRead);
-            utterance.onstart = () => {
-                readAloudButton.style.display = 'none';
-                stopReadingButton.style.display = 'inline-block';
-            };
-            utterance.onend = () => {
-                readAloudButton.style.display = 'inline-block';
-                stopReadingButton.style.display = 'none';
-            };
-            utterance.onerror = (event) => {
-                console.error('Speech synthesis error:', event.error);
-                showToast('Sorry, text-to-speech is not available.');
-                readAloudButton.style.display = 'inline-block';
-                stopReadingButton.style.display = 'none';
-            };
-            window.speechSynthesis.speak(utterance);
         }
 
         function updateReadingSetting(setting, change) {
@@ -1020,7 +1088,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (isTyping && !isPopupActive) return;
 
-            const cards = [...storyContainer.querySelectorAll('.story-card')];
+            let cards = [...storyContainer.querySelectorAll('.story-card')];
+            cards = cards.filter(card => card.style.display !== 'none');
+            
             let activeCard = storyContainer.querySelector('.active-card');
             let currentIndex = activeCard ? cards.indexOf(activeCard) : -1;
             
@@ -1070,6 +1140,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 const commentCard = collapseButton.closest('.comment-card');
                 const isCollapsed = commentCard.classList.toggle('collapsed');
                 collapseButton.textContent = isCollapsed ? '[+]' : '[–]';
+            }
+        }
+        
+        function navigateGallery(direction) {
+            let imagePosts = allFetchedPosts.filter(p => p.post_hint === 'image');
+            const currentPostIndex = imagePosts.findIndex(p => p.id === currentStoryId);
+            
+            if (currentPostIndex !== -1) {
+                let nextIndex = currentPostIndex + direction;
+                if (nextIndex >= imagePosts.length) {
+                    nextIndex = 0;
+                }
+                if (nextIndex < 0) {
+                    nextIndex = imagePosts.length - 1;
+                }
+                fetchAndShowComments(imagePosts[nextIndex]);
             }
         }
 

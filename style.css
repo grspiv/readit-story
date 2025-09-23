@@ -14,6 +14,7 @@
     --secondary-button-hover: #7f8c8d;
     --mod-color: #2ecc71; /* Color for moderator posts */
     --op-color: #3498db; /* Color for Original Poster comments */
+    --gilded-color: #FFD700; /* Gold for gilded posts */
     --popup-font-size: 1.1em;
     --popup-line-height: 1.6;
 }
@@ -73,7 +74,7 @@ body {
     padding: 20px;
     text-align: center;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-    margin-bottom: 30px;
+    margin-bottom: 0;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -136,15 +137,34 @@ body {
     gap: 15px;
     justify-content: center;
     align-items: flex-end;
-    margin-bottom: 20px;
+    
+    /* Sticky Controls */
+    position: -webkit-sticky;
+    position: sticky;
+    top: 0;
+    z-index: 900;
+    background-color: var(--bg-color);
+    padding: 20px;
+    margin: 0 -20px 20px -20px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    border-bottom: 1px solid var(--border-color);
+    transition: background-color 0.3s ease;
 }
 
 .action-bar {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
+    align-items: flex-end;
     gap: 15px;
     margin-bottom: 30px;
+}
+
+#saved-sort-section,
+#history-sort-section,
+#clear-saved-container,
+#clear-history-container {
+    flex-grow: 0;
 }
 
 .input-group {
@@ -163,6 +183,22 @@ body {
 .input-group.main-input {
     flex-grow: 2;
     min-width: 250px;
+}
+
+.search-container {
+    position: relative;
+}
+
+.clear-search-btn {
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(10%);
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #aaa;
 }
 
 #clear-saved-container div, #clear-history-container {
@@ -253,6 +289,49 @@ body {
     margin-bottom: 20px;
     font-size: clamp(1.2rem, 4vw, 1.5rem);
 }
+
+.subreddit-info {
+    display: none; /* Hidden by default */
+    background-color: var(--card-bg);
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 30px;
+    box-shadow: 0 6px 12px var(--shadow-color);
+    align-items: center;
+    gap: 20px;
+    border-left: 5px solid var(--highlight-color);
+}
+.subreddit-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+.subreddit-details {
+    flex-grow: 1;
+}
+.subreddit-info-header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+}
+.subreddit-title {
+    font-size: 1.5em;
+    font-weight: bold;
+    color: var(--heading-color);
+    margin: 0;
+}
+.subreddit-stats {
+    font-size: 0.9em;
+    color: #888;
+}
+.subreddit-description {
+    font-size: 0.95em;
+}
+
 
 .story-container {
     display: grid;
@@ -354,6 +433,12 @@ body {
     height: 16px;
     fill: #888;
 }
+
+.story-meta .gilded-icon {
+    fill: var(--gilded-color);
+    stroke: var(--gilded-color);
+}
+
 
 .story-flair {
     background-color: var(--highlight-color);
@@ -606,10 +691,14 @@ body {
 .popup-header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
     border-bottom: 2px solid var(--border-color);
     padding-bottom: 15px;
     margin-bottom: 10px;
+}
+
+.popup-title-container {
+    flex-grow: 1;
 }
 
 .popup-title {
@@ -617,6 +706,16 @@ body {
     color: var(--heading-color);
     margin: 0;
     padding-right: 15px;
+}
+
+.popup-subreddit-link {
+    font-size: 0.9em;
+    margin-top: 5px;
+}
+.popup-subreddit-link a {
+    color: var(--highlight-color);
+    text-decoration: none;
+    font-weight: bold;
 }
 
 .popup-header-actions {
@@ -842,6 +941,32 @@ body {
     bottom: 30px;
 }
 
+.gallery-nav {
+    position: fixed;
+    top: 50%;
+    transform: translateY(-50%);
+    background-color: rgba(0,0,0,0.5);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    font-size: 24px;
+    cursor: pointer;
+    z-index: 1001;
+    transition: background-color 0.3s;
+}
+.gallery-nav:hover {
+    background-color: rgba(0,0,0,0.8);
+}
+.gallery-nav.prev {
+    left: 20px;
+}
+.gallery-nav.next {
+    right: 20px;
+}
+
+
 /* Switch toggle for NSFW */
 .switch { position: relative; display: inline-block; width: 50px; height: 24px; }
 .switch input { opacity: 0; width: 0; height: 0; }
@@ -928,6 +1053,10 @@ input:checked + .slider:before { transform: translateX(26px); }
         flex-direction: column;
         align-items: stretch;
     }
+    .controls {
+        margin: 0 -20px 20px -20px;
+    }
+
 
     .input-group {
         min-width: 100%;
