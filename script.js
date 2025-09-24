@@ -2617,3 +2617,4 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.innerHTML = "<h1>A critical error occurred. Please refresh the page.</h1>";
     }
 });
+
