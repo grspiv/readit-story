@@ -219,14 +219,12 @@ document.addEventListener('DOMContentLoaded', () => {
             window.scrollTo({ top: 0, behavior: 'smooth' });
 
             // Hide all view-specific sections
-            [controlsContainer, savedSortSection, clearSavedContainer, historySortSection, clearHistoryContainer, subredditInfoPanel, markAllReadButton].forEach(el => el.style.display = 'none');
+            [controlsContainer, document.getElementById('saved-stories-view'), document.getElementById('history-view'), subredditInfoPanel, markAllReadButton].forEach(el => el.style.display = 'none');
             [viewSavedButton, viewHistoryButton].forEach(btn => btn.classList.remove('active'));
 
             if (view === 'browsing') {
                 controlsContainer.style.display = 'block';
                 markAllReadButton.style.display = 'flex';
-                viewSavedButton.textContent = 'Saved Stories';
-                viewHistoryButton.textContent = 'History';
                 if (options.refresh) {
                     const subreddit = subredditInput.value.trim().replace(/\s*\+\s*/g, '+'); // Sanitize multi-reddit input
                     const sort = sortSelect.value;
@@ -239,16 +237,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
             } else if (view === 'saved') {
-                savedSortSection.style.display = 'flex';
-                viewSavedButton.textContent = 'Back to Browsing';
+                document.getElementById('saved-stories-view').style.display = 'block';
                 viewSavedButton.classList.add('active');
-                viewHistoryButton.textContent = 'History';
                 displaySavedStories();
             } else if (view === 'history') {
-                historySortSection.style.display = 'flex';
-                viewHistoryButton.textContent = 'Back to Browsing';
+                document.getElementById('history-view').style.display = 'block';
                 viewHistoryButton.classList.add('active');
-                viewSavedButton.textContent = 'Saved Stories';
                 displayHistory();
             }
         }
@@ -2161,10 +2155,10 @@ document.addEventListener('DOMContentLoaded', () => {
             throw new Error(`Failed to fetch after ${maxRetries} retries. Last error: ${lastError ? lastError.message : 'Unknown error'}`);
         }
 
-        async function callGeminiAPI(prompt) {
+        async function callGeminiAPI(prompt, model = 'gemini-pro') {
             try {
                 const apiKey = await getGeminiApiKey();
-                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
                 const payload = {
                     contents: [{ parts: [{ text: prompt }] }],
@@ -2183,6 +2177,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         localStorage.removeItem('geminiApiKey'); 
                         throw new Error(`API Error: Invalid API key. Please check your key and try again.`);
                     }
+                     if (response.status === 404) {
+                        throw new Error(`API Error: Model not found. Please check the model name.`);
+                    }
                     throw new Error(`API Error: ${errorBody.error.message}`);
                 }
                 
@@ -2192,6 +2189,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (candidate && candidate.content?.parts?.[0]?.text) {
                     return candidate.content.parts[0].text;
                 } else {
+                    // Handle cases where the response structure is unexpected or content is missing
+                    console.warn("Unexpected API response structure:", result);
+                    if (candidate && candidate.finishReason !== 'STOP') {
+                         throw new Error(`Generation stopped for reason: ${candidate.finishReason}`);
+                    }
                     throw new Error("Invalid response structure from API.");
                 }
             } catch (error) {
@@ -2205,7 +2207,8 @@ document.addEventListener('DOMContentLoaded', () => {
             let fullText = "";
             try {
                 const apiKey = await getGeminiApiKey();
-                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:streamGenerateContent?key=${apiKey}&alt=sse`;
+                const model = 'gemini-pro';
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${apiKey}&alt=sse`;
 
                 const payload = { contents: [{ parts: [{ text: prompt }] }] };
 
@@ -2216,11 +2219,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
 
                 if (!response.ok) {
-                     const errorBody = await response.json();
+                    const errorBody = await response.json();
                     console.error("Gemini API Error:", errorBody);
                     if (response.status === 400 || response.status === 403) { 
                         localStorage.removeItem('geminiApiKey'); 
                         throw new Error(`API Error: Invalid API key. Please check your key and try again.`);
+                    }
+                    if (response.status === 404) {
+                        throw new Error(`API Error: Model not found. Please check the model name.`);
                     }
                     throw new Error(`API Error: ${errorBody.error.message}`);
                 }

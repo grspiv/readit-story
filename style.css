@@ -58,7 +58,6 @@ body {
     transition: background-color 0.3s ease, color 0.3s ease;
     -webkit-tap-highlight-color: transparent; /* Disable tap highlight on iOS */
     -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
     word-break: break-word;
 }
 
@@ -182,7 +181,7 @@ body {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
-    align-items: flex-end;
+    align-items: center;
     gap: 15px;
     margin-bottom: 30px;
 }
