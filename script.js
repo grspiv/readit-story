@@ -76,6 +76,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const closeApiKeyPopup = document.getElementById('close-api-key-popup');
         const saveApiKeyButton = document.getElementById('save-api-key-button');
         const apiKeyInput = document.getElementById('api-key-input');
+        const savedStoriesView = document.getElementById('saved-stories-view');
+        const historyView = document.getElementById('history-view');
 
 
         // --- Constants & State ---
@@ -219,12 +221,18 @@ document.addEventListener('DOMContentLoaded', () => {
             window.scrollTo({ top: 0, behavior: 'smooth' });
 
             // Hide all view-specific sections
-            [controlsContainer, document.getElementById('saved-stories-view'), document.getElementById('history-view'), subredditInfoPanel, markAllReadButton].forEach(el => el.style.display = 'none');
+            [controlsContainer, savedStoriesView, historyView, subredditInfoPanel, markAllReadButton].forEach(el => {
+                if(el) el.style.display = 'none';
+            });
             [viewSavedButton, viewHistoryButton].forEach(btn => btn.classList.remove('active'));
+            
+            // Reset button text
+            viewSavedButton.textContent = 'Saved Stories';
+            viewHistoryButton.textContent = 'History';
 
             if (view === 'browsing') {
-                controlsContainer.style.display = 'block';
-                markAllReadButton.style.display = 'flex';
+                if(controlsContainer) controlsContainer.style.display = 'block';
+                if(markAllReadButton) markAllReadButton.style.display = 'flex';
                 if (options.refresh) {
                     const subreddit = subredditInput.value.trim().replace(/\s*\+\s*/g, '+'); // Sanitize multi-reddit input
                     const sort = sortSelect.value;
@@ -237,11 +245,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
             } else if (view === 'saved') {
-                document.getElementById('saved-stories-view').style.display = 'block';
+                if(savedStoriesView) savedStoriesView.style.display = 'block';
+                viewSavedButton.textContent = 'Back to Browsing';
                 viewSavedButton.classList.add('active');
                 displaySavedStories();
             } else if (view === 'history') {
-                document.getElementById('history-view').style.display = 'block';
+                if(historyView) historyView.style.display = 'block';
+                viewHistoryButton.textContent = 'Back to Browsing';
                 viewHistoryButton.classList.add('active');
                 displayHistory();
             }
