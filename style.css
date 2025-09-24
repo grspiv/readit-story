@@ -57,14 +57,25 @@ body {
     animation: background-move 15s ease-in-out infinite alternate;
     transition: background-color 0.3s ease, color 0.3s ease;
     -webkit-tap-highlight-color: transparent; /* Disable tap highlight on iOS */
-    -webkit-text-size-adjust: none; /* Prevent font scaling on orientation change */
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     word-break: break-word;
 }
 
 @keyframes background-move {
     from { background-position: 0 0, 100% 100%; }
     to { background-position: 100% 100%, 0 0; }
+}
+
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
 }
 
 .app-header {
@@ -131,7 +142,6 @@ body {
 }
 
 .controls-container {
-    position: -webkit-sticky;
     position: sticky;
     top: 0;
     z-index: 900;
@@ -177,20 +187,66 @@ body {
     margin-bottom: 30px;
 }
 
+/* New styles for dedicated views */
+.dedicated-view {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 30px;
+    box-shadow: 0 6px 12px var(--shadow-color);
+}
+
+.view-header {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.view-header h3 {
+    margin: 0;
+    text-align: center;
+    color: var(--heading-color);
+    font-size: 1.5em;
+}
+
 #saved-sort-section,
 #history-sort-section {
-    align-items: flex-start;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    width: 100%;
 }
 
-#saved-sort-section .text-input,
-#history-sort-section .text-input {
-    margin-top: 8px;
+.sort-search-controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    align-items: flex-end;
 }
 
-#clear-saved-container,
-#clear-history-container {
-    flex-grow: 0;
+.sort-search-controls .input-group label:not(.visually-hidden) {
+    display: block;
+    margin-bottom: 5px;
 }
+
+.view-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 15px;
+    border-top: 1px solid var(--border-color);
+    padding-top: 20px;
+    margin-top: 10px;
+}
+
+.view-actions > div {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
 
 .input-group {
     display: flex;
@@ -226,12 +282,6 @@ body {
     color: #aaa;
 }
 
-#clear-saved-container div, #clear-history-container {
-    display: flex;
-    gap: 10px;
-}
-
-
 .text-input,
 .dropdown-input {
     padding: 12px 18px;
@@ -266,7 +316,6 @@ body {
     min-width: 150px;
     text-align: center;
     appearance: none;
-    flex-grow: 1;
 }
 
 .action-button:hover {
@@ -380,7 +429,6 @@ body {
     opacity: 0;
     animation: fadeIn 0.5s ease-out forwards;
     cursor: pointer;
-    -webkit-backface-visibility: hidden;
     backface-visibility: hidden;
     transform: translateZ(0);
 }
@@ -1472,20 +1520,35 @@ input:checked + .slider:before { transform: translateX(26px); }
         min-width: auto;
     }
     
-    .action-bar, .advanced-filters {
+    .action-bar {
         flex-direction: column;
         align-items: stretch;
-    }
-
-    .action-bar {
-        margin-top: 30px; /* Increased spacing */
     }
     
-    #saved-sort-section, #history-sort-section {
+    .dedicated-view {
+        padding: 15px;
+    }
+
+    .view-header {
         flex-direction: column;
         align-items: stretch;
     }
+    
+    .sort-search-controls {
+        grid-template-columns: 1fr; /* Stack on mobile */
+        gap: 15px;
+    }
 
+    .view-actions {
+        flex-direction: column;
+        align-items: stretch; /* Make buttons full-width */
+    }
+
+    .view-actions > div {
+         display: flex;
+         flex-direction: column;
+         gap: 10px;
+    }
 
     #toggle-filters-button {
         display: flex;
@@ -1548,3 +1611,4 @@ input:checked + .slider:before { transform: translateX(26px); }
     }
 
 }
+

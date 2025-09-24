@@ -49,7 +49,8 @@
     </header>
     
     <main class="main-content">
-        <section id="controls-container" class="controls-container">
+        <section id="controls-container" class="controls-container" aria-labelledby="controls-heading">
+            <h2 id="controls-heading" class="visually-hidden">Story Fetching Controls</h2>
             <div class="controls">
                 <div class="input-group main-input">
                     <label for="subreddit-input">Subreddit (use + for multi):</label>
@@ -107,52 +108,75 @@
             <button id="mark-all-read-button" class="action-button secondary" style="display: none;">Mark Visible as Read</button>
             <button id="view-saved-button" class="action-button secondary">Saved Stories</button>
             <button id="view-history-button" class="action-button secondary">History</button>
-             <div id="saved-sort-section" class="input-group" style="display: none;">
-                <label for="saved-sort-select">Sort Saved by:</label>
-                <select id="saved-sort-select" class="dropdown-input" aria-label="Sort saved stories by">
-                    <option value="date-desc">Date Saved (Newest)</option>
-                    <option value="date-asc">Date Saved (Oldest)</option>
-                    <option value="score-desc">Score</option>
-                    <option value="subreddit-az">Subreddit (A-Z)</option>
-                </select>
-                <div class="input-group search-container">
-                    <input type="text" id="saved-search-input" class="text-input" placeholder="Search saved stories..." aria-label="Search within saved stories">
-                </div>
-                <div id="saved-tags-filter" class="saved-tags-filter">
-                    <h4>Filter by Tag:</h4>
-                    <div id="tags-container"></div>
-                </div>
-            </div>
-             <div id="history-sort-section" class="input-group" style="display: none;">
-                <label for="history-sort-select">Sort History by:</label>
-                <select id="history-sort-select" class="dropdown-input" aria-label="Sort history by">
-                    <option value="date-desc">Date Read (Newest)</option>
-                    <option value="date-asc">Date Read (Oldest)</option>
-                    <option value="score-desc">Score</option>
-                    <option value="subreddit-az">Subreddit (A-Z)</option>
-                </select>
-                <div class="input-group search-container">
-                    <input type="text" id="history-search-input" class="text-input" placeholder="Search history..." aria-label="Search within history">
-                </div>
-            </div>
-             <div id="clear-saved-container" style="display: none;">
-                <div>
-                    <button id="export-saved-button" class="action-button secondary">Export</button>
-                    <button id="import-saved-button" class="action-button secondary">Import</button>
-                    <input type="file" id="import-file-input" accept=".json" style="display: none;" aria-label="Import saved stories file">
-                </div>
-                <button id="clear-saved-button" class="action-button danger">Clear All Saved</button>
-            </div>
-             <div id="clear-history-container" style="display: none;">
-                <button id="clear-history-button" class="action-button danger">Clear History</button>
-            </div>
         </nav>
+
+        <section id="dedicated-view-container">
+            <div id="saved-stories-view" class="dedicated-view" style="display: none;">
+                <div class="view-header">
+                    <h3>Saved Stories</h3>
+                    <div id="saved-sort-section">
+                        <div class="sort-search-controls">
+                            <div class="input-group">
+                                <label for="saved-sort-select">Sort by:</label>
+                                <select id="saved-sort-select" class="dropdown-input" aria-label="Sort saved stories by">
+                                    <option value="date-desc">Date Saved (Newest)</option>
+                                    <option value="date-asc">Date Saved (Oldest)</option>
+                                    <option value="score-desc">Score</option>
+                                    <option value="subreddit-az">Subreddit (A-Z)</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label for="saved-search-input" class="visually-hidden">Search Saved Stories</label>
+                                <input type="text" id="saved-search-input" class="text-input" placeholder="Search saved stories..." aria-label="Search within saved stories">
+                            </div>
+                        </div>
+                        <div id="saved-tags-filter" class="saved-tags-filter">
+                            <h4>Filter by Tag:</h4>
+                            <div id="tags-container"></div>
+                        </div>
+                    </div>
+                    <div id="clear-saved-container" class="view-actions">
+                        <div>
+                            <button id="export-saved-button" class="action-button secondary">Export</button>
+                            <button id="import-saved-button" class="action-button secondary">Import</button>
+                            <input type="file" id="import-file-input" accept=".json" style="display: none;" aria-label="Import saved stories file">
+                        </div>
+                        <button id="clear-saved-button" class="action-button danger">Clear All Saved</button>
+                    </div>
+                </div>
+            </div>
+            <div id="history-view" class="dedicated-view" style="display: none;">
+                 <div class="view-header">
+                    <h3>Reading History</h3>
+                    <div id="history-sort-section">
+                        <div class="sort-search-controls">
+                            <div class="input-group">
+                                <label for="history-sort-select">Sort by:</label>
+                                <select id="history-sort-select" class="dropdown-input" aria-label="Sort history by">
+                                    <option value="date-desc">Date Read (Newest)</option>
+                                    <option value="date-asc">Date Read (Oldest)</option>
+                                    <option value="score-desc">Score</option>
+                                    <option value="subreddit-az">Subreddit (A-Z)</option>
+                                </select>
+                            </div>
+                             <div class="input-group">
+                                <label for="history-search-input" class="visually-hidden">Search History</label>
+                                <input type="text" id="history-search-input" class="text-input" placeholder="Search history..." aria-label="Search within history">
+                            </div>
+                        </div>
+                    </div>
+                    <div id="clear-history-container" class="view-actions">
+                        <button id="clear-history-button" class="action-button danger">Clear History</button>
+                    </div>
+                </div>
+            </div>
+        </section>
 
         <section id="subreddit-info-panel" class="subreddit-info"></section>
 
         <h2 id="stories-heading" class="stories-heading"></h2>
 
-        <section id="story-container" class="story-container"></section>
+        <section id="story-container" class="story-container" aria-live="polite"></section>
 
         <div id="loading-indicator" class="loading-indicator" style="display: none;">
             <div class="spinner"></div>
@@ -171,7 +195,7 @@
             <div id="reading-progress-bar" class="reading-progress-bar"></div>
             <header class="popup-header">
                 <div class="popup-title-container">
-                    <h2 id="popup-title" class="popup-title"></h2>
+                    <h2 id="popup-title" class="popup-title">Story Title</h2>
                     <div id="popup-subreddit-link" class="popup-subreddit-link"></div>
                 </div>
                  <div class="popup-header-actions"></div>
@@ -183,16 +207,16 @@
             </header>
             <nav id="jump-to-nav" class="jump-to-nav"></nav>
             <div class="popup-controls"></div>
-            <div id="comment-navigator" class="comment-navigator" style="display: none;"></div>
-            <section id="series-navigation" class="series-navigation"></section>
+            <nav id="comment-navigator" class="comment-navigator" style="display: none;"></nav>
+            <nav id="series-navigation" class="series-navigation"></nav>
             <div id="popup-body" class="popup-body"></div>
-            <section id="saved-story-tags-container" class="saved-story-tags-container" style="display: none;">
-                <h4>Tags</h4>
+            <section id="saved-story-tags-container" class="saved-story-tags-container" style="display: none;" aria-labelledby="tags-heading">
+                <h4 id="tags-heading">Tags</h4>
                 <div id="story-tags" class="story-tags"></div>
                 <input type="text" id="add-tag-input" placeholder="Add a tag and press Enter..." aria-label="Add a tag to this story">
             </section>
-            <section id="saved-story-notes-container" class="saved-story-notes-container" style="display: none;">
-                <h4>My Notes</h4>
+            <section id="saved-story-notes-container" class="saved-story-notes-container" style="display: none;" aria-labelledby="notes-heading">
+                <h4 id="notes-heading">My Notes</h4>
                 <textarea id="saved-story-notes" placeholder="Add personal notes for this story..." aria-label="My notes for this story"></textarea>
             </section>
         </div>
@@ -205,7 +229,7 @@
          <div class="popup-content">
              <header class="popup-header">
                 <div class="popup-title-container">
-                    <h2 id="user-profile-title" class="popup-title"></h2>
+                    <h2 id="user-profile-title" class="popup-title">User Profile</h2>
                 </div>
                 <button id="close-user-profile-popup" class="close-button" title="Close" aria-label="Close user profile">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -269,7 +293,8 @@
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
     </button>
     <div id="toast-notification" role="alert" aria-live="assertive"></div>
-    <div id="quick-look-popup"></div>
+    <div id="quick-look-popup" role="tooltip"></div>
     <script src="script.js"></script>
 </body>
 </html>
+
