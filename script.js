@@ -1,4 +1,4 @@
-document.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('load', () => {
     try {
         // --- DOM Elements ---
         const fetchButton = document.getElementById('fetch-button');
@@ -131,6 +131,9 @@ document.addEventListener('DOMContentLoaded', () => {
         applyReadingSettings();
         populateSubredditHistory();
         applyCollapseCommentsPreference(savedCollapseComments);
+
+        // Make body visible now that initial styles and layout are applied
+        document.body.classList.add('loaded');
         
         const initialSubreddit = RANDOM_SUBREDDITS[Math.floor(Math.random() * RANDOM_SUBREDDITS.length)];
         subredditInput.value = initialSubreddit;
@@ -229,6 +232,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (view === 'browsing') {
                 if(controlsContainer) controlsContainer.style.display = 'block';
                 if(markAllReadButton) markAllReadButton.style.display = 'flex';
+                
                 if (options && options.refresh) {
                     const subreddit = subredditInput.value.trim().replace(/\s*\+\s*/g, '+');
                     const sort = sortSelect.value;
@@ -238,6 +242,18 @@ document.addEventListener('DOMContentLoaded', () => {
                         fetchStories(subreddit, sort, timeRange, false, currentSearchQuery);
                     } else {
                         showErrorPopup("Please enter a subreddit name.");
+                    }
+                } else {
+                    // When just switching back, restore the previous browsing view
+                    storyContainer.innerHTML = '';
+                    displayStories(allFetchedPosts);
+                    renderFilteredStories();
+                    const query = searchInput.value.trim();
+                    storiesHeading.textContent = query ? `Searching for "${query}" in r/${subredditInput.value}` : `Showing stories from r/${subredditInput.value}`;
+                    if (!subredditInput.value.includes('+') && !query) {
+                        subredditInfoPanel.style.display = 'flex';
+                    } else {
+                         subredditInfoPanel.style.display = 'none';
                     }
                 }
             } else if (view === 'saved') {
@@ -2648,4 +2664,5 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.innerHTML = "<h1>A critical error occurred. Please refresh the page.</h1>";
     }
 });
+
 
