@@ -2180,7 +2180,7 @@ document.addEventListener('DOMContentLoaded', () => {
             throw new Error(`Failed to fetch after ${maxRetries} retries. Last error: ${lastError ? lastError.message : 'Unknown error'}`);
         }
 
-        async function callGeminiAPI(prompt, model = 'gemini-pro') {
+        async function callGeminiAPI(prompt, model = 'gemini-2.5-flash-preview-05-20') {
             try {
                 const apiKey = await getGeminiApiKey();
                 const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
@@ -2232,7 +2232,7 @@ document.addEventListener('DOMContentLoaded', () => {
             let fullText = "";
             try {
                 const apiKey = await getGeminiApiKey();
-                const model = 'gemini-pro';
+                const model = 'gemini-2.5-flash-preview-05-20';
                 const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${apiKey}&alt=sse`;
 
                 const payload = { contents: [{ parts: [{ text: prompt }] }] };
