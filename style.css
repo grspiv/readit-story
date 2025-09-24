@@ -591,7 +591,11 @@ body {
 }
 
 .save-button.saved {
-    background-color: var(--highlight-color);
+    background-color: var(--danger-color);
+}
+
+.save-button.saved:hover {
+    background-color: #a82e20;
 }
 
 .read-button:hover, .save-button:hover {

@@ -26,16 +26,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const exportSavedButton = document.getElementById('export-saved-button');
         const importSavedButton = document.getElementById('import-saved-button');
         const importFileInput = document.getElementById('import-file-input');
-        const clearSavedContainer = document.getElementById('clear-saved-container');
         const flairFilterInput = document.getElementById('flair-filter-input');
         const minScoreInput = document.getElementById('min-score-input');
         const minCommentsInput = document.getElementById('min-comments-input');
-        const savedSortSection = document.getElementById('saved-sort-section');
         const savedSortSelect = document.getElementById('saved-sort-select');
-        const historySortSection = document.getElementById('history-sort-section');
         const historySortSelect = document.getElementById('history-sort-select');
-        const clearHistoryContainer = document.getElementById('clear-history-container');
-        const clearHistoryButton = document.getElementById('clear-history-button');
         const toastNotification = document.getElementById('toast-notification');
         const layoutToggleButton = document.getElementById('layout-toggle-button');
         const galleryToggleButton = document.getElementById('gallery-toggle-button');
@@ -78,6 +73,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const apiKeyInput = document.getElementById('api-key-input');
         const savedStoriesView = document.getElementById('saved-stories-view');
         const historyView = document.getElementById('history-view');
+        const clearHistoryButton = document.getElementById('clear-history-button');
 
 
         // --- Constants & State ---
@@ -151,10 +147,10 @@ document.addEventListener('DOMContentLoaded', () => {
         sortSelect.addEventListener('change', handleSortChange);
         viewSavedButton.addEventListener('click', () => switchToView('saved'));
         viewHistoryButton.addEventListener('click', () => switchToView('history'));
-        clearSavedButton.addEventListener('click', handleClearSaved);
-        clearHistoryButton.addEventListener('click', handleClearHistory);
-        exportSavedButton.addEventListener('click', handleExportSaved);
-        importSavedButton.addEventListener('click', () => importFileInput.click());
+        if(clearSavedButton) clearSavedButton.addEventListener('click', handleClearSaved);
+        if(clearHistoryButton) clearHistoryButton.addEventListener('click', handleClearHistory);
+        if(exportSavedButton) exportSavedButton.addEventListener('click', handleExportSaved);
+        if(importSavedButton) importSavedButton.addEventListener('click', () => importFileInput.click());
         importFileInput.addEventListener('change', handleImportFile);
         savedSortSelect.addEventListener('change', displaySavedStories);
         historySortSelect.addEventListener('change', displayHistory);
@@ -212,7 +208,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // --- Main View Controller ---
         function switchToView(view, options = {}) {
             if (view === currentView && view !== 'browsing') {
-                switchToView('browsing', { refresh: true });
+                switchToView('browsing');
                 return;
             }
 
@@ -233,8 +229,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (view === 'browsing') {
                 if(controlsContainer) controlsContainer.style.display = 'block';
                 if(markAllReadButton) markAllReadButton.style.display = 'flex';
-                if (options.refresh) {
-                    const subreddit = subredditInput.value.trim().replace(/\s*\+\s*/g, '+'); // Sanitize multi-reddit input
+                if (options && options.refresh) {
+                    const subreddit = subredditInput.value.trim().replace(/\s*\+\s*/g, '+');
                     const sort = sortSelect.value;
                     const timeRange = timeRangeSelect.value;
                     currentSearchQuery = searchInput.value.trim();
@@ -982,7 +978,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <a href="https://www.reddit.com${story.permalink}" target="_blank" rel="noopener noreferrer" class="icon-button" title="View on Reddit">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
                                 </a>
-                                <button class="save-button ${isSaved ? 'saved' : ''}">${isSaved ? 'Saved' : 'Save'}</button>
+                                <button class="save-button ${isSaved ? 'saved' : ''}">${isSaved ? 'Remove' : 'Save'}</button>
                             </div>
                         </div>
                     </div>
@@ -1016,7 +1012,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 switchToView('browsing', { refresh: true });
             } else if (e.target.closest('.save-button')) {
                 e.stopPropagation();
-                toggleSaveStory(e, story);
+                toggleSaveStory(story);
             } else if (e.target.closest('.share-button')) {
                 e.stopPropagation();
                 navigator.clipboard.writeText(redditLink);
@@ -1127,12 +1123,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         function displayHistory() {
             storyContainer.innerHTML = '';
-            
-            let history = getHistory();
+            const history = getHistory();
             const searchTerm = historySearchInput.value.trim().toLowerCase();
+            const viewActions = historyView.querySelector('.view-actions');
             
+            let filteredHistory = history;
             if (searchTerm) {
-                history = history.filter(story => 
+                filteredHistory = history.filter(story => 
                     story.title.toLowerCase().includes(searchTerm) || 
                     (story.selftext && story.selftext.toLowerCase().includes(searchTerm)) || 
                     story.subreddit.toLowerCase().includes(searchTerm)
@@ -1143,29 +1140,29 @@ document.addEventListener('DOMContentLoaded', () => {
             
             switch (sortMethod) {
                 case 'date-desc':
-                    history.sort((a, b) => new Date(b.readAt) - new Date(a.readAt));
+                    filteredHistory.sort((a, b) => new Date(b.readAt) - new Date(a.readAt));
                     break;
                 case 'date-asc':
-                    history.sort((a, b) => new Date(a.readAt) - new Date(b.readAt));
+                    filteredHistory.sort((a, b) => new Date(a.readAt) - new Date(b.readAt));
                     break;
                 case 'score-desc':
-                    history.sort((a, b) => (b.score || 0) - (a.score || 0));
+                    filteredHistory.sort((a, b) => (b.score || 0) - (a.score || 0));
                     break;
                 case 'subreddit-az':
-                    history.sort((a, b) => a.subreddit.localeCompare(b.subreddit));
+                    filteredHistory.sort((a, b) => a.subreddit.localeCompare(b.subreddit));
                     break;
             }
 
-            storiesHeading.textContent = `Showing ${history.length} stor${history.length === 1 ? 'y' : 'ies'} from your history`;
+            storiesHeading.textContent = `Showing ${filteredHistory.length} stor${filteredHistory.length === 1 ? 'y' : 'ies'} from your history`;
             
-            if (getHistory().length > 0) {
-                clearHistoryContainer.style.display = 'flex';
-                displayStories(history, { isHistoryView: true });
-                if (history.length === 0) {
+            if (history.length > 0) {
+                 if (viewActions) viewActions.style.display = 'flex';
+                displayStories(filteredHistory, { isHistoryView: true });
+                if (filteredHistory.length === 0) {
                     storyContainer.innerHTML = `<p class="empty-state">No stories in your history match your search.</p>`;
                 }
             } else {
-                clearHistoryContainer.style.display = 'none';
+                 if (viewActions) viewActions.style.display = 'none';
                 storyContainer.innerHTML = `<p class="empty-state">You haven't read any stories yet.</p>`;
             }
         }
@@ -1187,33 +1184,50 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        function toggleSaveStory(event, story) {
-            const button = event.target;
+        function toggleSaveStory(story) {
             let savedStories = getSavedStories();
             const storyIndex = savedStories.findIndex(s => s.id === story.id);
+            const isNowSaved = storyIndex === -1;
 
-            if (storyIndex > -1) {
-                savedStories.splice(storyIndex, 1);
-                button.textContent = 'Save';
-                button.classList.remove('saved');
-                if (popupOverlay.classList.contains('active') && currentStoryId === story.id) {
-                    savedStoryNotesContainer.style.display = 'none';
-                    savedStoryTagsContainer.style.display = 'none';
-                }
-            } else {
+            if (isNowSaved) {
                 const storyToSave = { ...story, dateSaved: new Date().toISOString(), tags: [] };
                 savedStories.push(storyToSave);
-                button.textContent = 'Saved';
-                button.classList.add('saved');
-                 if (popupOverlay.classList.contains('active') && currentStoryId === story.id) {
+            } else {
+                savedStories.splice(storyIndex, 1);
+            }
+
+            localStorage.setItem(SAVED_STORIES_KEY, JSON.stringify(savedStories));
+
+            if (currentView === 'saved') {
+                displaySavedStories();
+                return;
+            }
+
+            const storyCards = document.querySelectorAll(`.story-card[data-story-id="${story.id}"]`);
+            storyCards.forEach(card => {
+                const button = card.querySelector('.save-button');
+                if (button) {
+                    if (isNowSaved) {
+                        button.textContent = 'Remove';
+                        button.classList.add('saved');
+                    } else {
+                        button.textContent = 'Save';
+                        button.classList.remove('saved');
+                    }
+                }
+            });
+
+            if (popupOverlay.classList.contains('active') && currentStoryId === story.id) {
+                if (isNowSaved) {
                     savedStoryNotesContainer.style.display = 'block';
                     savedStoryTagsContainer.style.display = 'block';
                     savedStoryNotes.value = getStoryNote(story.id);
                     renderStoryTags(story.id);
+                } else {
+                    savedStoryNotesContainer.style.display = 'none';
+                    savedStoryTagsContainer.style.display = 'none';
                 }
             }
-            localStorage.setItem(SAVED_STORIES_KEY, JSON.stringify(savedStories));
-            if (currentView === 'saved') displaySavedStories();
         }
         
         function getSavedStories() {
@@ -1226,8 +1240,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         function displaySavedStories() {
             storyContainer.innerHTML = '';
-            
             let savedStories = getSavedStories();
+            const viewActions = savedStoriesView.querySelector('.view-actions');
+            
             renderTagFilters();
             
             const searchTerm = savedSearchInput.value.trim().toLowerCase();
@@ -1264,13 +1279,13 @@ document.addEventListener('DOMContentLoaded', () => {
             storiesHeading.textContent = `Showing ${savedStories.length} saved stor${savedStories.length === 1 ? 'y' : 'ies'}`;
             
             if (getSavedStories().length > 0) {
-                clearSavedContainer.style.display = 'flex';
+                if(viewActions) viewActions.style.display = 'flex';
                 displayStories(savedStories);
                  if (savedStories.length === 0) {
                     storyContainer.innerHTML = `<p class="empty-state">No saved stories match your search or filter.</p>`;
                 }
             } else {
-                clearSavedContainer.style.display = 'none';
+                if(viewActions) viewActions.style.display = 'none';
                 storyContainer.innerHTML = `<p class="empty-state">You haven't saved any stories yet.</p>`;
             }
         }
