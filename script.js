@@ -131,9 +131,6 @@ window.addEventListener('load', () => {
         applyReadingSettings();
         populateSubredditHistory();
         applyCollapseCommentsPreference(savedCollapseComments);
-
-        // Make body visible now that initial styles and layout are applied
-        document.body.classList.add('loaded');
         
         const initialSubreddit = RANDOM_SUBREDDITS[Math.floor(Math.random() * RANDOM_SUBREDDITS.length)];
         subredditInput.value = initialSubreddit;
@@ -207,6 +204,9 @@ window.addEventListener('load', () => {
         closeApiKeyPopup.addEventListener('click', () => hideApiKeyModal(true)); // Pass true to indicate rejection
         saveApiKeyButton.addEventListener('click', handleSaveApiKey);
 
+        // Make body visible now that initial styles and layout are applied
+        document.body.classList.add('loaded');
+
 
         // --- Main View Controller ---
         function switchToView(view, options = {}) {
@@ -271,8 +271,14 @@ window.addEventListener('load', () => {
 
         // --- Functions ---
         function applyTheme(theme) {
-            document.body.className = '';
-            if (theme !== 'light') document.body.classList.add(theme);
+            // Remove only theme-related classes, preserving others like 'loaded'
+            document.body.classList.remove('dark', 'sepia');
+            
+            // Add the new theme class if it's not the default light theme
+            if (theme !== 'light') {
+                document.body.classList.add(theme);
+            }
+            
             localStorage.setItem('theme', theme);
             themeSelect.value = theme;
         }
@@ -2664,5 +2670,4 @@ window.addEventListener('load', () => {
         document.body.innerHTML = "<h1>A critical error occurred. Please refresh the page.</h1>";
     }
 });
-
 

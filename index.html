@@ -113,20 +113,21 @@
         <section id="saved-stories-view" class="dedicated-view" style="display: none;">
             <div class="view-header">
                 <h3>Saved Stories</h3>
-                <div id="saved-sort-section" class="controls">
-                    <div class="input-group">
-                        <label for="saved-sort-select">Sort by:</label>
-                        <select id="saved-sort-select" class="dropdown-input" aria-label="Sort saved stories by">
-                            <option value="date-desc">Date Saved (Newest)</option>
-                            <option value="date-asc">Date Saved (Oldest)</option>
-                            <option value="score-desc">Score</option>
-                            <option value="subreddit-az">Subreddit (A-Z)</option>
-                        </select>
-                    </div>
-                    <div class="input-group main-input search-container">
-                        <label for="saved-search-input">Search:</label>
-                        <input type="text" id="saved-search-input" class="text-input" placeholder="Search saved stories..." aria-label="Search within saved stories">
-                        <button id="clear-saved-search-btn" class="clear-search-btn" style="display: none;" aria-label="Clear saved search">&times;</button>
+                <div id="saved-sort-section">
+                    <div class="sort-search-controls">
+                        <div class="input-group">
+                            <label for="saved-sort-select">Sort by:</label>
+                            <select id="saved-sort-select" class="dropdown-input" aria-label="Sort saved stories by">
+                                <option value="date-desc">Date Saved (Newest)</option>
+                                <option value="date-asc">Date Saved (Oldest)</option>
+                                <option value="score-desc">Score</option>
+                                <option value="subreddit-az">Subreddit (A-Z)</option>
+                            </select>
+                        </div>
+                        <div class="input-group search-container">
+                            <label for="saved-search-input" class="visually-hidden">Search Saved Stories</label>
+                            <input type="text" id="saved-search-input" class="text-input" placeholder="Search saved stories..." aria-label="Search within saved stories">
+                        </div>
                     </div>
                 </div>
                 <div id="saved-tags-filter" class="saved-tags-filter">
@@ -147,20 +148,21 @@
         <section id="history-view" class="dedicated-view" style="display: none;">
             <div class="view-header">
                  <h3>Reading History</h3>
-                <div id="history-sort-section" class="controls">
-                    <div class="input-group">
-                        <label for="history-sort-select">Sort by:</label>
-                        <select id="history-sort-select" class="dropdown-input" aria-label="Sort history by">
-                            <option value="date-desc">Date Read (Newest)</option>
-                            <option value="date-asc">Date Read (Oldest)</option>
-                            <option value="score-desc">Score</option>
-                            <option value="subreddit-az">Subreddit (A-Z)</option>
-                        </select>
-                    </div>
-                    <div class="input-group main-input search-container">
-                        <label for="history-search-input">Search:</label>
-                        <input type="text" id="history-search-input" class="text-input" placeholder="Search history..." aria-label="Search within history">
-                        <button id="clear-history-search-btn" class="clear-search-btn" style="display: none;" aria-label="Clear history search">&times;</button>
+                <div id="history-sort-section">
+                    <div class="sort-search-controls">
+                        <div class="input-group">
+                            <label for="history-sort-select">Sort by:</label>
+                            <select id="history-sort-select" class="dropdown-input" aria-label="Sort history by">
+                                <option value="date-desc">Date Read (Newest)</option>
+                                <option value="date-asc">Date Read (Oldest)</option>
+                                <option value="score-desc">Score</option>
+                                <option value="subreddit-az">Subreddit (A-Z)</option>
+                            </select>
+                        </div>
+                        <div class="input-group search-container">
+                            <label for="history-search-input" class="visually-hidden">Search History</label>
+                            <input type="text" id="history-search-input" class="text-input" placeholder="Search history..." aria-label="Search within history">
+                        </div>
                     </div>
                 </div>
             </div>
