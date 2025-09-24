@@ -509,7 +509,18 @@ window.addEventListener('load', () => {
                 if (!response.ok) throw new Error('Could not fetch subreddit info.');
                 const data = await response.json();
                 const info = data.data;
-
+        
+                const fullDescription = info.public_description || '';
+                let isTruncated = false;
+                let shortDescription = fullDescription;
+        
+                // Truncate only if the description is long and contains a period.
+                const firstSentenceIndex = fullDescription.indexOf('.');
+                if (firstSentenceIndex !== -1 && fullDescription.length > 200) { 
+                    shortDescription = fullDescription.substring(0, firstSentenceIndex + 1);
+                    isTruncated = shortDescription.length < fullDescription.length;
+                }
+        
                 subredditInfoPanel.innerHTML = `
                     <img src="${info.community_icon || info.icon_img || 'https://placehold.co/60x60/e74c3c/fff?text=R'}" alt="Subreddit Icon" class="subreddit-icon">
                     <div class="subreddit-details">
@@ -517,9 +528,27 @@ window.addEventListener('load', () => {
                             <h3 class="subreddit-title">${info.display_name_prefixed}</h3>
                             <span class="subreddit-stats">${(info.subscribers || 0).toLocaleString()} members</span>
                         </div>
-                        <p class="subreddit-description">${renderMarkdown(info.public_description)}</p>
+                        <div class="subreddit-description-container">
+                            <p class="subreddit-description">${renderMarkdown(shortDescription)}</p>
+                            ${isTruncated ? '<button id="toggle-description-button" class="action-button secondary small">Read More</button>' : ''}
+                        </div>
                     </div>
                 `;
+        
+                if (isTruncated) {
+                    // Scope the search for the button and paragraph to within the panel
+                    const toggleButton = subredditInfoPanel.querySelector('#toggle-description-button');
+                    const descriptionP = subredditInfoPanel.querySelector('.subreddit-description');
+                    
+                    if (toggleButton && descriptionP) {
+                        toggleButton.addEventListener('click', () => {
+                            const isShowingShort = toggleButton.textContent === 'Read More';
+                            descriptionP.innerHTML = renderMarkdown(isShowingShort ? fullDescription : shortDescription);
+                            toggleButton.textContent = isShowingShort ? 'Show Less' : 'Read More';
+                        });
+                    }
+                }
+        
                 subredditInfoPanel.style.display = 'flex';
             } catch (error) {
                 console.error("Failed to display subreddit info:", error);
