@@ -204,13 +204,13 @@ body.loaded {
 }
 
 
-.theme-switcher, .filter-switch {
+.theme-switcher, .filter-switch, .layout-switcher {
     display: flex;
     align-items: center;
     gap: 10px;
 }
 
-.theme-switcher label, .filter-switch label {
+.theme-switcher label, .filter-switch label, .layout-switcher label {
     font-weight: bold;
     white-space: nowrap;
 }
@@ -512,10 +512,7 @@ body.loaded {
 }
 
 .story-container {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 30px;
-    transition: grid-template-columns 0.4s ease;
+    transition: all 0.4s ease;
 }
 
 .story-card {
@@ -733,51 +730,146 @@ body.loaded {
     stroke: currentColor;
 }
 
-/* List View Styles */
-.story-container.list-view {
-    grid-template-columns: 1fr;
+
+/* --- START: LAYOUT STYLES --- */
+
+/* 1. Grid View (Default) */
+.story-container.grid-view {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 30px;
 }
-.story-container.list-view .story-card {
+
+/* 2. List View Styles */
+.story-container.list-view {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 20px;
+}
+.list-view .story-card {
     flex-direction: row;
     align-items: center;
 }
-.story-container.list-view .story-card-media {
+.list-view .story-card-media {
     width: 120px;
     height: 80px;
-    max-height: none;
     flex-shrink: 0;
 }
-.story-container.list-view .preview {
+.list-view .preview {
     -webkit-line-clamp: 2;
 }
-
-
-/* Gallery View Styles */
-.story-container.gallery-view {
-    grid-template-columns: 1fr;
-    gap: 40px;
+@media (max-width: 600px) {
+    .list-view .story-card {
+        flex-direction: column;
+    }
+    .list-view .story-card-media {
+        width: 100%;
+        height: 150px;
+    }
 }
 
-.story-container.gallery-view .story-card {
+/* 3. Compact View Styles */
+.story-container.compact-view {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 20px;
+}
+.compact-view .story-card-content {
+    padding: 15px;
+}
+.compact-view .story-card-media {
+    height: 120px;
+}
+.compact-view h3 {
+    font-size: 1.1em;
+}
+.compact-view .preview, .compact-view .reading-time {
+    display: none;
+}
+
+/* 4. Magazine View Styles */
+.story-container.magazine-view {
+    column-count: 3;
+    column-gap: 25px;
+}
+.magazine-view .story-card {
+    display: inline-block;
+    width: 100%;
+    margin-bottom: 25px;
+    break-inside: avoid;
+}
+.magazine-view .story-card:hover {
+    transform: none;
+    box-shadow: 0 6px 12px var(--shadow-color);
+    border-color: transparent;
+}
+@media (max-width: 1024px) {
+    .story-container.magazine-view { column-count: 2; }
+}
+@media (max-width: 600px) {
+    .story-container.magazine-view { column-count: 1; }
+}
+
+/* 5. Classic View Styles */
+.story-container.classic-view {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.classic-view .story-card {
+    flex-direction: row;
+    align-items: center;
+    padding: 10px;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px var(--shadow-color);
+    gap: 10px;
+}
+.classic-view .story-card:hover {
+    transform: none;
+}
+.classic-view .story-card-media {
+    width: 70px;
+    height: 50px;
+    flex-shrink: 0;
+    border-radius: 4px;
+}
+.classic-view .story-card-content {
+    padding: 0;
+}
+.classic-view .preview, .classic-view .reading-time, .classic-view .story-card-actions {
+    display: none;
+}
+.classic-view h3 {
+    font-size: 1.1em;
+    margin-bottom: 8px;
+}
+
+/* Gallery View (can be combined with other layouts) */
+.story-container.gallery-view {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 40px;
+    column-count: 1; /* Override magazine columns */
+}
+.gallery-view .story-card {
     background-color: transparent;
     box-shadow: none;
     border: none;
-    position: relative; /* Needed for overlay */
+    position: relative;
+    break-inside: avoid;
 }
-.story-container.gallery-view .story-card:hover {
+.gallery-view .story-card:hover {
      transform: none;
      box-shadow: none;
      border-color: transparent;
 }
-
-.story-container.gallery-view .story-card-media {
-    height: auto; /* Let image height be natural */
+.gallery-view .story-card-media {
+    height: auto;
     max-height: 80vh;
     border-radius: 16px;
     overflow: hidden;
     box-shadow: 0 10px 20px rgba(0,0,0,0.2);
 }
-
 .gallery-card-overlay {
     position: absolute;
     bottom: 0;
@@ -790,28 +882,18 @@ body.loaded {
     opacity: 0;
     transform: translateY(10px);
     transition: opacity 0.3s ease, transform 0.3s ease;
-    pointer-events: none; /* Allow clicking through */
+    pointer-events: none;
 }
-
-.story-container.gallery-view .story-card:hover .gallery-card-overlay {
+.gallery-view .story-card:hover .gallery-card-overlay {
     opacity: 1;
     transform: translateY(0);
 }
+.gallery-card-overlay h4 { margin: 0 0 5px 0; font-size: 1.1em; text-shadow: 1px 1px 2px #000; }
+.gallery-card-overlay p { margin: 0; font-size: 0.9em; }
+.gallery-view .preview, .gallery-view .story-card-content { display: none; }
 
-.gallery-card-overlay h4 {
-    margin: 0 0 5px 0;
-    font-size: 1.1em;
-    text-shadow: 1px 1px 2px #000;
-}
-.gallery-card-overlay p {
-    margin: 0;
-    font-size: 0.9em;
-}
+/* --- END: LAYOUT STYLES --- */
 
-.story-container.gallery-view .preview,
-.story-container.gallery-view .story-card-content {
-    display: none;
-}
 
 .crosspost-info {
     font-size: 0.9em;
@@ -999,6 +1081,7 @@ body.loaded {
 .popup-secondary-controls {
     gap: 20px;
 }
+
 
 .jump-to-nav {
     display: flex;
@@ -1709,14 +1792,6 @@ input:checked + .slider:before { transform: translateX(26px); }
         align-items: stretch;
         gap: 15px;
         max-height: 1000px; /* Arbitrary large value to allow content to expand */
-    }
-    
-    .story-container.list-view .story-card {
-        flex-direction: column;
-    }
-    .story-container.list-view .story-card-media {
-        width: 100%;
-        height: 150px;
     }
 
     .popup-content {

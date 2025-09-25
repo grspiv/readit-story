@@ -32,10 +32,8 @@ window.addEventListener('load', () => {
         const savedSortSelect = document.getElementById('saved-sort-select');
         const historySortSelect = document.getElementById('history-sort-select');
         const toastNotification = document.getElementById('toast-notification');
-        const layoutToggleButton = document.getElementById('layout-toggle-button');
+        const layoutSelect = document.getElementById('layout-select');
         const galleryToggleButton = document.getElementById('gallery-toggle-button');
-        const layoutIconGrid = document.getElementById('layout-icon-grid');
-        const layoutIconList = document.getElementById('layout-icon-list');
         const nsfwToggle = document.getElementById('nsfw-toggle');
         const infiniteScrollLoader = document.getElementById('infinite-scroll-loader');
         const subredditInfoPanel = document.getElementById('subreddit-info-panel');
@@ -138,7 +136,7 @@ window.addEventListener('load', () => {
 
         // --- Event Listeners ---
         themeSelect.addEventListener('change', () => applyTheme(themeSelect.value));
-        layoutToggleButton.addEventListener('click', handleLayoutToggle);
+        layoutSelect.addEventListener('change', () => applyLayout(layoutSelect.value));
         galleryToggleButton.addEventListener('click', handleGalleryToggle);
         nsfwToggle.addEventListener('change', () => applyNSFWPreference(nsfwToggle.checked, true));
         fetchButton.addEventListener('click', () => switchToView('browsing', { refresh: true }));
@@ -284,18 +282,13 @@ window.addEventListener('load', () => {
         }
         
         function applyLayout(layout) {
-            storyContainer.classList.remove('list-view', 'gallery-view');
+            const allLayoutClasses = ['grid-view', 'list-view', 'compact-view', 'magazine-view', 'classic-view'];
+            storyContainer.classList.remove(...allLayoutClasses);
             
-            if (layout === 'list') {
-                storyContainer.classList.add('list-view');
-                layoutIconGrid.style.display = 'none';
-                layoutIconList.style.display = 'block';
-            } else { // Grid is default
-                storyContainer.classList.remove('list-view');
-                layoutIconGrid.style.display = 'block';
-                layoutIconList.style.display = 'none';
-            }
-             localStorage.setItem(LAYOUT_PREFERENCE_KEY, layout);
+            storyContainer.classList.add(`${layout}-view`);
+        
+            localStorage.setItem(LAYOUT_PREFERENCE_KEY, layout);
+            layoutSelect.value = layout;
         }
 
         function applyGalleryPreference(isGallery) {
@@ -336,11 +329,6 @@ window.addEventListener('load', () => {
                     });
                 }
             }
-        }
-        
-        function handleLayoutToggle() {
-            const isListView = storyContainer.classList.contains('list-view');
-            applyLayout(isListView ? 'grid' : 'list');
         }
         
         function handleGalleryToggle() {
