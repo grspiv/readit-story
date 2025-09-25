@@ -93,6 +93,22 @@ body.dracula {
     --accent-color: #ffb86c;
 }
 
+body.kizzie {
+    --bg-color: #2c3338;
+    --card-bg: #353d42;
+    --text-color: #d3d7de;
+    --heading-color: #ffffff;
+    --button-color: #00f5d4;
+    --button-hover-color: #00d9bc;
+    --button-text-color: #2c3338;
+    --border-color: #4a545b;
+    --shadow-color: rgba(0, 0, 0, 0.4);
+    --highlight-color: #9de2ff;
+    --accent-color: #fa0081;
+    --secondary-button-bg: #4a545b;
+    --secondary-button-hover: #5a646b;
+}
+
 
 *, *::before, *::after {
     box-sizing: border-box;
