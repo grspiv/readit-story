@@ -72,6 +72,12 @@ window.addEventListener('load', () => {
         const savedStoriesView = document.getElementById('saved-stories-view');
         const historyView = document.getElementById('history-view');
         const clearHistoryButton = document.getElementById('clear-history-button');
+        const viewPlaylistButton = document.getElementById('view-playlist-button');
+        const playlistOverlay = document.getElementById('playlist-overlay');
+        const closePlaylistPopup = document.getElementById('close-playlist-popup');
+        const playlistItemsContainer = document.getElementById('playlist-items-container');
+        const playAllPlaylistButton = document.getElementById('play-all-playlist-button');
+        const clearPlaylistButton = document.getElementById('clear-playlist-button');
 
 
         // --- Constants & State ---
@@ -80,6 +86,7 @@ window.addEventListener('load', () => {
         const READ_HISTORY_KEY = 'redditStorytellerHistory';
         const SUBREDDIT_HISTORY_KEY = 'redditSubredditHistory';
         const LAYOUT_PREFERENCE_KEY = 'redditStorytellerLayout';
+        const NARRATION_PLAYLIST_KEY = 'redditStorytellerPlaylist';
         const GALLERY_PREFERENCE_KEY = 'redditStorytellerGallery';
         const NSFW_PREFERENCE_KEY = 'redditStorytellerNSFW';
         const READING_SETTINGS_KEY = 'redditStorytellerReading';
@@ -88,7 +95,7 @@ window.addEventListener('load', () => {
         const READING_POSITION_KEY = 'redditStorytellerReadingPosition';
         const RANDOM_SUBREDDITS = ['nosleep', 'LetsNotMeet', 'glitch_in_the_matrix', 'tifu', 'confession', 'maliciouscompliance', 'talesfromtechsupport', 'WritingPrompts', 'shortscarystories', 'UnresolvedMysteries', 'ProRevenge', 'IDontWorkHereLady', 'talesfromretail', 'pettyrevenge', 'entitledparents'];
         
-        let currentView = 'browsing'; // browsing, saved, history
+        let currentView = 'browsing'; // browsing, saved, history, playlist
         let currentAfterToken = null;
         let allFetchedPosts = [];
         let currentSearchQuery = '';
@@ -106,15 +113,19 @@ window.addEventListener('load', () => {
         let originalStoryContent = null;
         let currentStorySummary = null;
         let currentStoryTranslations = {};
+        let sentimentCache = {};
         
         // Narration State
         let audioContext;
+        let ambianceAudio; // For background sounds
         let audioBufferQueue = [];
         let nextScheduleTime = 0;
         let isNarrationPlaying = false;
         let isNarrationPaused = false;
         let activeSourceNodes = [];
         let narrationAudioCache = {}; // Cache for generated audio buffers
+        let narrationPlaylist = [];
+        let currentPlaylistIndex = -1;
 
 
         // --- Initialization ---
@@ -129,6 +140,7 @@ window.addEventListener('load', () => {
         applyReadingSettings();
         populateSubredditHistory();
         applyCollapseCommentsPreference(savedCollapseComments);
+        loadPlaylist();
         
         const initialSubreddit = RANDOM_SUBREDDITS[Math.floor(Math.random() * RANDOM_SUBREDDITS.length)];
         subredditInput.value = initialSubreddit;
@@ -145,6 +157,10 @@ window.addEventListener('load', () => {
         sortSelect.addEventListener('change', handleSortChange);
         viewSavedButton.addEventListener('click', () => switchToView('saved'));
         viewHistoryButton.addEventListener('click', () => switchToView('history'));
+        viewPlaylistButton.addEventListener('click', () => openPlaylist());
+        closePlaylistPopup.addEventListener('click', () => playlistOverlay.classList.remove('active'));
+        clearPlaylistButton.addEventListener('click', handleClearPlaylist);
+        playAllPlaylistButton.addEventListener('click', handlePlayAllPlaylist);
         if(clearSavedButton) clearSavedButton.addEventListener('click', handleClearSaved);
         if(clearHistoryButton) clearHistoryButton.addEventListener('click', handleClearHistory);
         if(exportSavedButton) exportSavedButton.addEventListener('click', handleExportSaved);
@@ -221,11 +237,13 @@ window.addEventListener('load', () => {
             [controlsContainer, savedStoriesView, historyView, subredditInfoPanel, markAllReadButton].forEach(el => {
                 if(el) el.style.display = 'none';
             });
-            [viewSavedButton, viewHistoryButton].forEach(btn => btn.classList.remove('active'));
+            [viewSavedButton, viewHistoryButton, viewPlaylistButton].forEach(btn => btn.classList.remove('active'));
             
             // Reset button text
             viewSavedButton.textContent = 'Saved Stories';
             viewHistoryButton.textContent = 'History';
+            viewPlaylistButton.textContent = 'Narration Playlist';
+
 
             if (view === 'browsing') {
                 if(controlsContainer) controlsContainer.style.display = 'block';
@@ -403,12 +421,15 @@ window.addEventListener('load', () => {
             timeRangeControls.style.display = isTop || (isSearch && sortSelect.value === 'top') ? 'flex' : 'none';
         }
 
-        function stopNarration() {
+        function stopNarration(stopPlaylist = true) {
             const narrateButton = document.getElementById('narrate-button');
             const stopButton = document.getElementById('stop-narration-button');
         
             isNarrationPlaying = false;
             isNarrationPaused = false;
+            if (stopPlaylist) {
+                currentPlaylistIndex = -1; // Stop the playlist
+            }
         
             activeSourceNodes.forEach(source => {
                 try { source.stop(); } catch(e) {}
@@ -420,6 +441,11 @@ window.addEventListener('load', () => {
                 audioContext.close();
                 audioContext = null;
             }
+
+            if (ambianceAudio) {
+                ambianceAudio.pause();
+                ambianceAudio.src = '';
+            }
         
             if (narrateButton) {
                 narrateButton.textContent = 'Narrate Story';
@@ -428,6 +454,8 @@ window.addEventListener('load', () => {
             if (stopButton) {
                 stopButton.style.display = 'none';
             }
+            playAllPlaylistButton.textContent = "Play All";
+            displayPlaylist(); // Refresh to show no story is playing
         }
 
         function closePopup() {
@@ -660,15 +688,31 @@ window.addEventListener('load', () => {
             popupControls.innerHTML = `
                 <div class="popup-main-actions">
                     <button id="summarize-button" class="action-button secondary">Summarize</button>
+                    <button id="eli5-button" class="action-button secondary">ELI5</button>
+                    ${story.subreddit.toLowerCase() === 'writingprompts' ? '<button id="continue-story-button" class="action-button secondary">Continue Story</button>' : ''}
                     <button id="word-cloud-button" class="action-button secondary">Word Cloud</button>
-                    <button id="live-comments-button" class="action-button secondary">Live Comments</button>
                     <div class="narration-controls">
                         <button id="narrate-button" class="action-button secondary">Narrate Story</button>
                         <button id="stop-narration-button" class="action-button danger" style="display:none;">Stop</button>
                     </div>
                 </div>
                 <div class="popup-secondary-controls">
-                    <div class="translation-controls">
+                     <div class="narration-options">
+                        <label for="ambiance-toggle">Ambiance:</label>
+                        <label class="switch">
+                            <input type="checkbox" id="ambiance-toggle" aria-label="Toggle background ambiance">
+                            <span class="slider round"></span>
+                        </label>
+                        <label for="narration-speed-select">Speed:</label>
+                        <select id="narration-speed-select" class="dropdown-input">
+                            <option value="0.75">0.75x</option>
+                            <option value="1" selected>1x</option>
+                            <option value="1.25">1.25x</option>
+                            <option value="1.5">1.5x</option>
+                            <option value="2">2x</option>
+                        </select>
+                     </div>
+                     <div class="translation-controls">
                         <label for="translation-select">Translate:</label>
                         <select id="translation-select" class="dropdown-input">
                             <option value="">Original</option>
@@ -706,8 +750,12 @@ window.addEventListener('load', () => {
                 fetchCommentsForCurrentStory(e.target.value);
             });
             document.getElementById('word-cloud-button').addEventListener('click', () => generateWordCloud(story));
-            document.getElementById('live-comments-button').addEventListener('click', toggleLiveComments);
-            document.getElementById('summarize-button').addEventListener('click', () => handleSummarize(story));
+            document.getElementById('summarize-button').addEventListener('click', () => handleSummarize(story, 'summarize'));
+            document.getElementById('eli5-button').addEventListener('click', () => handleSummarize(story, 'eli5'));
+            const continueStoryBtn = document.getElementById('continue-story-button');
+            if (continueStoryBtn) {
+                continueStoryBtn.addEventListener('click', () => handleStoryContinuation(story));
+            }
             document.getElementById('narrate-button').addEventListener('click', () => handleNarration(story));
             document.getElementById('stop-narration-button').addEventListener('click', () => stopNarration());
             document.getElementById('translation-select').addEventListener('change', (e) => handleTranslation(story, e.target.value));
@@ -722,6 +770,14 @@ window.addEventListener('load', () => {
             headerActions.innerHTML = '';
             
             const redditLink = `https://www.reddit.com${story.permalink}`;
+
+            const playlistBtn = document.createElement('button');
+            playlistBtn.className = 'icon-button add-to-playlist-button';
+            playlistBtn.title = 'Add to Narration Playlist';
+            playlistBtn.setAttribute('aria-label', 'Add to Narration Playlist');
+            playlistBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>`;
+            playlistBtn.onclick = () => addToPlaylist(story);
+            headerActions.appendChild(playlistBtn);
             
             const shareBtn = document.createElement('button');
             shareBtn.className = 'icon-button';
@@ -1018,6 +1074,7 @@ window.addEventListener('load', () => {
                             <span><svg width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>${timeAgo}</span>
                              ${gildedHTML}
                             ${story.link_flair_text ? `<span class="story-flair">${story.link_flair_text}</span>` : ''}
+                            <span class="sentiment-badge" data-story-id="${story.id}"></span>
                         </div>
                         <h3><a href="https://www.reddit.com${story.permalink}" target="_blank" rel="noopener noreferrer">${story.title}</a></h3>
                         <p class="author" title="View u/${story.author}'s profile">by u/${story.author}</p>
@@ -1027,8 +1084,11 @@ window.addEventListener('load', () => {
                         <div class="story-card-actions">
                             <button class="read-button">Read Story</button>
                             <div class="action-buttons">
-                                <button class="icon-button share-button" title="Copy Link">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>
+                                <button class="icon-button sentiment-button" title="Analyze Comment Sentiment">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="8" y1="15" x2="16" y2="15"></line><line x1="9" y1="9" x2="9.01" y2="9"></line><line x1="15" y1="9" x2="15.01" y2="9"></line></svg>
+                                </button>
+                                <button class="icon-button add-to-playlist-button" title="Add to Narration Playlist">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                                 </button>
                                 <a href="https://www.reddit.com${story.permalink}" target="_blank" rel="noopener noreferrer" class="icon-button" title="View on Reddit">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
@@ -1058,6 +1118,12 @@ window.addEventListener('load', () => {
             if (e.target.closest('.read-button')) {
                 e.stopPropagation();
                 fetchAndShowComments(story);
+            } else if (e.target.closest('.add-to-playlist-button')) {
+                e.stopPropagation();
+                addToPlaylist(story);
+            } else if (e.target.closest('.sentiment-button')) {
+                e.stopPropagation();
+                getCommentSentiment(story);
             } else if (e.target.closest('.author')) {
                 e.stopPropagation();
                 fetchUserProfile(story.author);
@@ -2365,65 +2431,97 @@ window.addEventListener('load', () => {
             }
         }
 
-        async function handleSummarize(story) {
-            const summarizeButton = document.getElementById('summarize-button');
+        async function handleSummarize(story, mode = 'summarize') {
+            const button = document.getElementById(mode === 'summarize' ? 'summarize-button' : 'eli5-button');
             const storyContentWrapper = document.getElementById('story-content-wrapper');
+            const titleText = mode === 'summarize' ? 'AI Summary' : 'Explained Like You\'re 5';
+            const buttonText = mode === 'summarize' ? 'Summarize' : 'ELI5';
 
             if (!story.selftext) {
-                showToast("This story has no text to summarize.");
+                showToast("This story has no text to process.");
                 return;
             }
 
-            if (summarizeButton.textContent === 'Show Original') {
+            if (button.textContent === 'Show Original') {
                 storyContentWrapper.innerHTML = originalStoryContent;
                 originalStoryContent = null;
-                summarizeButton.textContent = 'Summarize';
-                return;
-            }
-
-            if (currentStorySummary) {
-                originalStoryContent = storyContentWrapper.innerHTML;
-                storyContentWrapper.innerHTML = currentStorySummary;
-                summarizeButton.textContent = 'Show Original';
+                button.textContent = buttonText;
                 return;
             }
             
-            summarizeButton.disabled = true;
-            summarizeButton.textContent = 'Summarizing...';
+            button.disabled = true;
+            button.textContent = 'Generating...';
             originalStoryContent = storyContentWrapper.innerHTML;
 
-            const summaryContainer = document.createElement('div');
-            summaryContainer.className = 'ai-output-box';
-            summaryContainer.innerHTML = `
-                <h4>AI Summary</h4>
-                <div class="markdown-content" id="live-summary-content"></div>
+            const outputContainer = document.createElement('div');
+            outputContainer.className = 'ai-output-box';
+            outputContainer.innerHTML = `
+                <h4>${titleText}</h4>
+                <div class="markdown-content" id="live-ai-content"></div>
             `;
             storyContentWrapper.innerHTML = '';
-            storyContentWrapper.appendChild(summaryContainer);
+            storyContentWrapper.appendChild(outputContainer);
 
-            const liveSummaryContent = document.getElementById('live-summary-content');
-            let fullSummaryText = "";
+            const liveContent = document.getElementById('live-ai-content');
+            let fullText = "";
+            let prompt = '';
+
+            if (mode === 'summarize') {
+                prompt = `Summarize the following story in a single, well-written paragraph. Be concise and capture the main points:\n\n---\n\n${story.selftext}`;
+            } else { // eli5
+                prompt = `Explain the following text like I'm 5 years old. Use simple words and short sentences:\n\n---\n\n${story.selftext}`;
+            }
 
             try {
-                const prompt = `Summarize the following story in a single, well-written paragraph. Be concise and capture the main points:\n\n---\n\n${story.selftext}`;
                 await streamGeminiAPI(prompt, (chunk) => {
-                    fullSummaryText += chunk;
-                    liveSummaryContent.innerHTML = renderMarkdown(fullSummaryText + '...');
+                    fullText += chunk;
+                    liveContent.innerHTML = renderMarkdown(fullText + '...');
                 });
                 
-                liveSummaryContent.innerHTML = renderMarkdown(fullSummaryText);
-                currentStorySummary = storyContentWrapper.innerHTML;
-                summarizeButton.textContent = 'Show Original';
+                liveContent.innerHTML = renderMarkdown(fullText);
+                button.textContent = 'Show Original';
 
             } catch (error) {
-                storyContentWrapper.innerHTML = originalStoryContent; // Restore original content on error
+                storyContentWrapper.innerHTML = originalStoryContent;
                 originalStoryContent = null;
-                showToast(`Sorry, the summary could not be generated. ${error.message}`);
+                showToast(`Sorry, the output could not be generated. ${error.message}`);
             } finally {
-                summarizeButton.disabled = false;
-                if(originalStoryContent === null) { // If it failed, reset button
-                     summarizeButton.textContent = 'Summarize';
+                button.disabled = false;
+                if(storyContentWrapper.innerHTML.includes('live-ai-content') && button.textContent !== 'Show Original') {
+                     button.textContent = buttonText;
                 }
+            }
+        }
+
+        async function handleStoryContinuation(story) {
+            const button = document.getElementById('continue-story-button');
+            button.disabled = true;
+            button.textContent = 'Writing...';
+
+            const storyContentWrapper = document.getElementById('story-content-wrapper');
+            const storyContent = storyContentWrapper.querySelector('.markdown-content');
+
+            const continuationContainer = document.createElement('div');
+            continuationContainer.className = 'ai-output-box continuation';
+            continuationContainer.innerHTML = `<h4>AI Continuation...</h4><div id="live-continuation-content"></div>`;
+            storyContent.appendChild(document.createElement('hr'));
+            storyContent.appendChild(continuationContainer);
+            
+            const liveContent = document.getElementById('live-continuation-content');
+            let fullText = "";
+            const prompt = `This is a story from a creative writing prompt. Continue the story for another 2-3 paragraphs in the same style and tone. Do not add a title or any introductory text. Here is the story so far:\n\n---\n\n${story.selftext}`;
+            
+            try {
+                await streamGeminiAPI(prompt, (chunk) => {
+                    fullText += chunk;
+                    liveContent.innerHTML = renderMarkdown(fullText + '...');
+                });
+                liveContent.innerHTML = renderMarkdown(fullText);
+            } catch (error) {
+                 showToast(`Sorry, the story continuation could not be generated. ${error.message}`);
+                 continuationContainer.remove();
+            } finally {
+                button.style.display = 'none'; // Hide button after use
             }
         }
 
@@ -2436,10 +2534,8 @@ window.addEventListener('load', () => {
                     storyContentWrapper.innerHTML = originalStoryContent;
                     originalStoryContent = null;
                 }
-                const summarizeButton = document.getElementById('summarize-button');
-                if (summarizeButton && summarizeButton.textContent === 'Show Original') {
-                    summarizeButton.textContent = 'Summarize';
-                }
+                document.getElementById('summarize-button').textContent = 'Summarize';
+                document.getElementById('eli5-button').textContent = 'ELI5';
                 currentStorySummary = null;
                 return;
             }
@@ -2563,7 +2659,9 @@ window.addEventListener('load', () => {
         
         function scheduleNextBuffer() {
             if (!isNarrationPlaying || isNarrationPaused || audioBufferQueue.length === 0) {
-                if (isNarrationPlaying && audioBufferQueue.length === 0) {
+                 if (isNarrationPlaying && audioBufferQueue.length === 0 && currentPlaylistIndex !== -1) {
+                    playNextInPlaylist();
+                } else {
                     stopNarration();
                 }
                 return;
@@ -2573,6 +2671,9 @@ window.addEventListener('load', () => {
             const source = audioContext.createBufferSource();
             source.buffer = audioBuffer;
             source.connect(audioContext.destination);
+
+            const speed = document.getElementById('narration-speed-select')?.value || 1;
+            source.playbackRate.value = parseFloat(speed);
         
             const now = audioContext.currentTime;
             nextScheduleTime = Math.max(now, nextScheduleTime);
@@ -2585,29 +2686,30 @@ window.addEventListener('load', () => {
                 scheduleNextBuffer();
             };
         
-            nextScheduleTime += audioBuffer.duration;
+            nextScheduleTime += audioBuffer.duration / source.playbackRate.value;
         }
         
-        async function handleNarration(story) {
+        async function handleNarration(story, stopPlaylistOnEnd = true) {
             const narrateButton = document.getElementById('narrate-button');
             const stopButton = document.getElementById('stop-narration-button');
         
             if (isNarrationPlaying && !isNarrationPaused) {
                 if (audioContext) audioContext.suspend();
                 isNarrationPaused = true;
-                narrateButton.textContent = 'Resume Narration';
+                narrateButton.textContent = 'Resume';
                 return;
             }
         
             if (isNarrationPlaying && isNarrationPaused) {
                 if (audioContext) audioContext.resume();
                 isNarrationPaused = false;
-                narrateButton.textContent = 'Pause Narration';
+                narrateButton.textContent = 'Pause';
                 return;
             }
         
             if (!story.selftext) {
                 showToast("This story has no text to narrate.");
+                if (!stopPlaylistOnEnd) playNextInPlaylist(); // Skip to next in playlist
                 return;
             }
         
@@ -2621,7 +2723,6 @@ window.addEventListener('load', () => {
                 isNarrationPaused = false;
         
                 if (narrationAudioCache[story.id]) {
-                    console.log("Using cached narration audio.");
                     audioBufferQueue = [...narrationAudioCache[story.id]];
                 } else {
                     const textToNarrate = `Title: ${story.title}. By user ${story.author}. ${story.selftext}`;
@@ -2631,15 +2732,16 @@ window.addEventListener('load', () => {
                     const audioBufferPromises = chunks.map(chunk => fetchAndDecodeAudio(chunk, audioContext));
                     const allBuffers = await Promise.all(audioBufferPromises);
                     
-                    audioBufferQueue = allBuffers.filter(b => b); // Filter out any nulls from errors
-                    narrationAudioCache[story.id] = [...audioBufferQueue]; // Cache the successful buffers
+                    audioBufferQueue = allBuffers.filter(b => b);
+                    narrationAudioCache[story.id] = [...audioBufferQueue];
                 }
         
                 if (audioBufferQueue.length > 0) {
                     narrateButton.disabled = false;
-                    narrateButton.textContent = 'Pause Narration';
+                    narrateButton.textContent = 'Pause';
                     stopButton.style.display = 'inline-block';
                     scheduleNextBuffer();
+                    handleAmbiance(story);
                 } else {
                     throw new Error("Could not generate or find cached audio.");
                 }
@@ -2647,7 +2749,7 @@ window.addEventListener('load', () => {
             } catch (error) {
                 console.error("Narration failed to start:", error);
                 showToast(`Could not initialize narration: ${error.message}`);
-                stopNarration();
+                stopNarration(stopPlaylistOnEnd);
             }
         }
         
@@ -2714,7 +2816,176 @@ window.addEventListener('load', () => {
             }
         }
 
+        // --- Playlist Functions ---
+        function loadPlaylist() {
+            narrationPlaylist = JSON.parse(localStorage.getItem(NARRATION_PLAYLIST_KEY)) || [];
+        }
 
+        function savePlaylist() {
+            localStorage.setItem(NARRATION_PLAYLIST_KEY, JSON.stringify(narrationPlaylist));
+        }
+
+        function addToPlaylist(story) {
+            if (!narrationPlaylist.some(item => item.id === story.id)) {
+                narrationPlaylist.push(story);
+                savePlaylist();
+                showToast(`"${story.title}" added to playlist.`);
+                displayPlaylist();
+            } else {
+                showToast("Story is already in the playlist.");
+            }
+        }
+
+        function removeFromPlaylist(storyId) {
+            narrationPlaylist = narrationPlaylist.filter(item => item.id !== storyId);
+            savePlaylist();
+            displayPlaylist();
+        }
+
+        function handleClearPlaylist() {
+            if (confirm("Are you sure you want to clear the entire narration playlist?")) {
+                narrationPlaylist = [];
+                savePlaylist();
+                displayPlaylist();
+                showToast("Playlist cleared.");
+            }
+        }
+
+        function displayPlaylist() {
+            playlistItemsContainer.innerHTML = '';
+            if (narrationPlaylist.length === 0) {
+                playlistItemsContainer.innerHTML = `<p class="empty-state">Your narration playlist is empty.</p>`;
+                playAllPlaylistButton.disabled = true;
+                return;
+            }
+            
+            playAllPlaylistButton.disabled = false;
+            const fragment = document.createDocumentFragment();
+            narrationPlaylist.forEach((story, index) => {
+                const itemEl = document.createElement('div');
+                itemEl.className = 'playlist-item';
+                if (index === currentPlaylistIndex) {
+                    itemEl.classList.add('playing');
+                }
+                itemEl.dataset.storyId = story.id;
+                itemEl.innerHTML = `
+                    <div class="playlist-item-info">
+                        <div class="playlist-item-title">${story.title}</div>
+                        <div class="playlist-item-author">by u/${story.author} in r/${story.subreddit}</div>
+                    </div>
+                    <button class="icon-button danger remove-from-playlist-button" title="Remove from playlist">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                `;
+                itemEl.querySelector('.remove-from-playlist-button').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    removeFromPlaylist(story.id);
+                });
+                fragment.appendChild(itemEl);
+            });
+            playlistItemsContainer.appendChild(fragment);
+        }
+
+        function openPlaylist() {
+            displayPlaylist();
+            playlistOverlay.classList.add('active');
+        }
+
+        function handlePlayAllPlaylist() {
+            if(isNarrationPlaying) {
+                stopNarration();
+            } else {
+                currentPlaylistIndex = 0;
+                playStoryFromPlaylist(currentPlaylistIndex);
+            }
+        }
+
+        function playNextInPlaylist() {
+            currentPlaylistIndex++;
+            if (currentPlaylistIndex < narrationPlaylist.length) {
+                playStoryFromPlaylist(currentPlaylistIndex);
+            } else {
+                showToast("Playlist finished.");
+                stopNarration();
+            }
+        }
+
+        function playStoryFromPlaylist(index) {
+            const story = narrationPlaylist[index];
+            if (story) {
+                playAllPlaylistButton.textContent = `Stop (Playing ${index + 1}/${narrationPlaylist.length})`;
+                displayPlaylist(); // Refresh to highlight the current story
+                
+                // Open the popup for the story if it's not already open
+                if (!popupOverlay.classList.contains('active') || currentStoryId !== story.id) {
+                    fetchAndShowComments(story).then(() => {
+                        handleNarration(story, false);
+                    });
+                } else {
+                     handleNarration(story, false);
+                }
+            }
+        }
+
+        // --- New AI Functions ---
+        async function getCommentSentiment(story) {
+            if (!story) return;
+
+            const badge = document.querySelector(`.sentiment-badge[data-story-id="${story.id}"]`);
+            if (!badge || badge.textContent) return; // Already analyzed or in progress
+            
+            badge.textContent = '...'; // Indicate loading
+
+            if (sentimentCache[story.id]) {
+                displaySentimentBadge(story.id, sentimentCache[story.id]);
+                return;
+            }
+
+            sentimentCache[story.id] = 'loading'; 
+
+            try {
+                const commentsUrl = `${REDDIT_API_BASE_URL}r/${story.subreddit}/comments/${story.id}.json?sort=confidence&limit=15`;
+                const response = await fetch(commentsUrl);
+                if (!response.ok) throw new Error("Could not fetch comments for sentiment analysis.");
+
+                const data = await response.json();
+                const comments = data[1].data.children.filter(c => c.kind === 't1').map(c => c.data.body);
+
+                if (comments.length < 3) {
+                    sentimentCache[story.id] = 'neutral';
+                    displaySentimentBadge(story.id, 'neutral');
+                    return; 
+                }
+
+                const commentsText = comments.slice(0, 10).join('\n\n---\n\n');
+                const prompt = `Analyze the sentiment of the following Reddit comments. Respond with only a single word from this list: Positive, Negative, Mixed, Debate, or Neutral. Do not add explanations or punctuation.\n\n### Comments:\n\n${commentsText}`;
+                let sentiment = await callGeminiAPI(prompt);
+                sentiment = sentiment.trim().toLowerCase().replace(/[^a-z]/g, '');
+
+                const validSentiments = ['positive', 'negative', 'mixed', 'debate', 'neutral'];
+                if (!validSentiments.includes(sentiment)) {
+                    sentiment = 'neutral';
+                }
+
+                sentimentCache[story.id] = sentiment;
+                displaySentimentBadge(story.id, sentiment);
+
+            } catch (error) {
+                console.error(`Could not get sentiment for story ${story.id}:`, error);
+                delete sentimentCache[story.id];
+                 if(badge) badge.textContent = ''; // Clear loading indicator on error
+            }
+        }
+
+        function displaySentimentBadge(storyId, sentiment) {
+            const badge = document.querySelector(`.sentiment-badge[data-story-id="${storyId}"]`);
+            if (badge) {
+                badge.textContent = sentiment;
+                badge.className = 'sentiment-badge'; // Reset classes
+                badge.classList.add(`sentiment-${sentiment}`);
+                badge.classList.add('visible');
+            }
+        }
     } catch (e) {
         console.error("An error occurred during page initialization:", e);
         document.body.innerHTML = "<h1>A critical error occurred. Please refresh the page.</h1>";

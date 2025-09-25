@@ -93,7 +93,7 @@ body.dracula {
     --accent-color: #ffb86c;
 }
 
-body.kizzie {
+body.kaydoh {
     --bg-color: #2c3338;
     --card-bg: #353d42;
     --text-color: #d3d7de;
@@ -107,6 +107,23 @@ body.kizzie {
     --accent-color: #fa0081;
     --secondary-button-bg: #4a545b;
     --secondary-button-hover: #5a646b;
+}
+
+body.kizzie {
+    --bg-color: #4a4e69;
+    --card-bg: #5a5f7f;
+    --text-color: #e0e1dd;
+    --heading-color: #ffffff;
+    --button-color: #9a8c98;
+    --button-hover-color: #c7b9c9;
+    --button-text-color: #22223b;
+    --border-color: #6b7091;
+    --shadow-color: rgba(34, 34, 59, 0.4);
+    --highlight-color: #c9a2e5;
+    --accent-color: #f2e9e4;
+    --danger-color: #c17c74;
+    --secondary-button-bg: #6b7091;
+    --secondary-button-hover: #7d83a3;
 }
 
 
@@ -768,49 +785,7 @@ body.loaded {
     }
 }
 
-/* 3. Compact View Styles */
-.story-container.compact-view {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-    gap: 20px;
-}
-.compact-view .story-card-content {
-    padding: 15px;
-}
-.compact-view .story-card-media {
-    height: 120px;
-}
-.compact-view h3 {
-    font-size: 1.1em;
-}
-.compact-view .preview, .compact-view .reading-time {
-    display: none;
-}
-
-/* 4. Magazine View Styles */
-.story-container.magazine-view {
-    column-count: 3;
-    column-gap: 25px;
-}
-.magazine-view .story-card {
-    display: inline-block;
-    width: 100%;
-    margin-bottom: 25px;
-    break-inside: avoid;
-}
-.magazine-view .story-card:hover {
-    transform: none;
-    box-shadow: 0 6px 12px var(--shadow-color);
-    border-color: transparent;
-}
-@media (max-width: 1024px) {
-    .story-container.magazine-view { column-count: 2; }
-}
-@media (max-width: 600px) {
-    .story-container.magazine-view { column-count: 1; }
-}
-
-/* 5. Classic View Styles */
+/* 3. Classic View Styles */
 .story-container.classic-view {
     display: flex;
     flex-direction: column;
@@ -835,13 +810,27 @@ body.loaded {
 }
 .classic-view .story-card-content {
     padding: 0;
+    flex-grow: 1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
-.classic-view .preview, .classic-view .reading-time, .classic-view .story-card-actions {
+.classic-view .preview, .classic-view .reading-time {
     display: none;
 }
 .classic-view h3 {
     font-size: 1.1em;
     margin-bottom: 8px;
+}
+.classic-view .story-card-actions {
+    margin-top: 0;
+    flex-shrink: 0;
+}
+.classic-view .read-button,
+.classic-view .save-button {
+    padding: 8px 12px;
+    font-size: 13px;
+    min-width: 80px;
 }
 
 /* Gallery View (can be combined with other layouts) */
@@ -849,7 +838,6 @@ body.loaded {
     display: grid;
     grid-template-columns: 1fr;
     gap: 40px;
-    column-count: 1; /* Override magazine columns */
 }
 .gallery-view .story-card {
     background-color: transparent;
@@ -894,6 +882,68 @@ body.loaded {
 
 /* --- END: LAYOUT STYLES --- */
 
+/* --- START: NEW FEATURE STYLES --- */
+.sentiment-badge {
+    font-size: 0.75em;
+    font-weight: bold;
+    padding: 3px 8px;
+    border-radius: 10px;
+    text-transform: capitalize;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+}
+.sentiment-badge.visible { opacity: 1; }
+.sentiment-badge.positive { background-color: #2ecc71; color: white; }
+.sentiment-badge.mixed { background-color: #f1c40f; color: #333; }
+.sentiment-badge.negative { background-color: #e74c3c; color: white; }
+.sentiment-badge.debate { background-color: #9b59b6; color: white; }
+.sentiment-badge.neutral { background-color: var(--secondary-button-bg); color: white; }
+
+.narration-options {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+.narration-options .switch {
+    margin-right: 5px;
+}
+
+#playlist-items-container .playlist-item {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 12px;
+    border-bottom: 1px solid var(--border-color);
+    transition: background-color 0.3s ease;
+}
+#playlist-items-container .playlist-item:last-child {
+    border-bottom: none;
+}
+.playlist-item.playing {
+    background-color: rgba(var(--highlight-color-rgb), 0.15);
+}
+.playlist-item.playing .playlist-item-title::before {
+    content: '▶';
+    margin-right: 10px;
+    color: var(--highlight-color);
+}
+.playlist-item-info {
+    flex-grow: 1;
+    min-width: 0; /* Prevents text overflow issues */
+}
+.playlist-item-title {
+    font-weight: bold;
+    color: var(--heading-color);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.playlist-item-author {
+    font-size: 0.9em;
+    opacity: 0.7;
+}
+
+/* --- END: NEW FEATURE STYLES --- */
 
 .crosspost-info {
     font-size: 0.9em;

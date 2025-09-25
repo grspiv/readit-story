@@ -24,6 +24,7 @@
                     <option value="forest">Forest</option>
                     <option value="solarized-light">Solarized Light</option>
                     <option value="dracula">Dracula</option>
+                    <option value="kaydoh">Kaydoh</option>
                     <option value="kizzie">Kizzie</option>
                 </select>
             </div>
@@ -32,8 +33,6 @@
                 <select id="layout-select" class="dropdown-input" aria-label="Select story layout">
                     <option value="grid">Grid</option>
                     <option value="list">List</option>
-                    <option value="compact">Compact</option>
-                    <option value="magazine">Magazine</option>
                     <option value="classic">Classic</option>
                 </select>
             </div>
@@ -116,6 +115,7 @@
 
         <nav class="action-bar">
             <button id="mark-all-read-button" class="action-button secondary" style="display: none;">Mark Visible as Read</button>
+            <button id="view-playlist-button" class="action-button secondary">Narration Playlist</button>
             <button id="view-saved-button" class="action-button secondary">Saved Stories</button>
             <button id="view-history-button" class="action-button secondary">History</button>
         </nav>
@@ -266,6 +266,29 @@
                 <p class="word-cloud-info">A visual representation of the most common words in the comments.</p>
             </div>
          </div>
+    </div>
+
+    <div id="playlist-overlay" class="popup-overlay" role="dialog" aria-modal="true" aria-labelledby="playlist-title">
+        <div class="popup-content">
+            <header class="popup-header">
+                <div class="popup-title-container">
+                    <h2 id="playlist-title" class="popup-title">Narration Playlist</h2>
+                </div>
+                <button id="close-playlist-popup" class="close-button" title="Close" aria-label="Close narration playlist">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+            </header>
+            <div id="playlist-body" class="popup-body">
+                <div id="playlist-controls" class="action-bar">
+                    <button id="play-all-playlist-button" class="action-button">Play All</button>
+                    <button id="clear-playlist-button" class="action-button danger">Clear Playlist</button>
+                </div>
+                <div id="playlist-items-container">
+                    </div>
+            </div>
+        </div>
     </div>
 
     <div id="api-key-overlay" class="popup-overlay" role="dialog" aria-modal="true" aria-labelledby="api-key-title">
