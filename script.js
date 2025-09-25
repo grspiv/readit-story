@@ -287,8 +287,8 @@ window.addEventListener('load', () => {
 
         // --- Functions ---
         function applyTheme(theme) {
-            // Remove only theme-related classes, preserving others like 'loaded'
-            document.body.classList.remove('dark', 'sepia', 'slate', 'forest', 'solarized-light', 'dracula', 'kizzie');
+            // Remove all possible theme classes, preserving essential layout classes
+            document.body.classList.remove('dark', 'sepia', 'slate', 'forest', 'solarized-light', 'dracula', 'kaydoh', 'kizzie');
             
             // Add the new theme class if it's not the default light theme
             if (theme !== 'light') {
@@ -300,7 +300,7 @@ window.addEventListener('load', () => {
         }
         
         function applyLayout(layout) {
-            const allLayoutClasses = ['grid-view', 'list-view', 'compact-view', 'magazine-view', 'classic-view'];
+            const allLayoutClasses = ['grid-view', 'list-view', 'classic-view'];
             storyContainer.classList.remove(...allLayoutClasses);
             
             storyContainer.classList.add(`${layout}-view`);
@@ -1667,39 +1667,22 @@ window.addEventListener('load', () => {
         }
         
         function handlePopupBodyClick(e) {
-            // Find the closest comment card to the click target
-            const commentCard = e.target.closest('.comment-card');
-            
-            // If the click is not inside a comment card, do nothing related to comments.
-            if (!commentCard) {
-                 // Handle tag removal, which is outside the comment card structure
-                const removeTagBtn = e.target.closest('.remove-tag');
-                if(removeTagBtn) {
-                    const tag = removeTagBtn.parentElement.dataset.tag;
-                    removeTagFromStory(currentStoryId, tag);
-                }
-                return;
-            }
-    
-            // --- Check for clicks on specific interactive elements inside the card ---
-            // If a link was clicked, let it perform its action and DO NOT toggle the comment.
-            // This includes author links and any links in the comment body.
-            if (e.target.closest('a')) {
-                // Handle author link click specifically to fetch profile
-                if (e.target.closest('.author-link')) {
-                     e.preventDefault();
-                     const author = e.target.closest('.author-link').textContent.replace('u/', '');
-                     fetchUserProfile(author);
-                }
-                // For any other link, just return and let the browser's default behavior handle it.
-                return; 
-            }
-    
-            // --- If none of the above interactive elements were clicked, toggle the card ---
-            const isCollapsed = commentCard.classList.toggle('collapsed');
-            const collapseButton = commentCard.querySelector('.collapse-comment');
+            const collapseButton = e.target.closest('.collapse-comment');
             if (collapseButton) {
+                const commentCard = collapseButton.closest('.comment-card');
+                const isCollapsed = commentCard.classList.toggle('collapsed');
                 collapseButton.textContent = isCollapsed ? '[+]' : '[–]';
+            }
+            const authorLink = e.target.closest('.author-link');
+            if(authorLink) {
+                e.preventDefault();
+                const author = authorLink.textContent.replace('u/', '');
+                fetchUserProfile(author);
+            }
+            const removeTagBtn = e.target.closest('.remove-tag');
+            if(removeTagBtn) {
+                const tag = removeTagBtn.parentElement.dataset.tag;
+                removeTagFromStory(currentStoryId, tag);
             }
         }
         
