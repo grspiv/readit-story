@@ -717,6 +717,9 @@ body.loaded {
     color: #888;
     transition: color 0.3s, transform 0.2s;
     appearance: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .icon-button:hover {
@@ -942,7 +945,21 @@ body.loaded {
     gap: 10px;
     margin-left: auto;
     flex-shrink: 0;
+    align-items: center;
 }
+
+.popup-header-actions .icon-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    color: var(--text-color);
+}
+.popup-header-actions .icon-button:hover {
+    color: var(--highlight-color);
+}
+
 
 .close-button {
     background: none;
@@ -960,13 +977,27 @@ body.loaded {
 }
 
 .popup-controls {
-    padding: 10px 20px;
     display: flex;
-    gap: 20px;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    align-items: center;
+    flex-direction: column;
+    gap: 15px;
+    padding: 15px 20px;
+    border-top: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border-color);
     margin-bottom: 10px;
+}
+
+.popup-main-actions,
+.popup-secondary-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+}
+
+.popup-secondary-controls {
+    gap: 20px;
 }
 
 .jump-to-nav {
@@ -992,27 +1023,33 @@ body.loaded {
     color: var(--heading-color);
 }
 
-.popup-actions-left, .popup-actions-right {
-    display: flex;
-    gap: 15px;
-    flex-wrap: wrap;
-    align-items: center;
-}
 .reading-controls, .comment-sort-controls, .narration-controls, .translation-controls {
     display: flex;
     align-items: center;
     gap: 8px;
-    flex-wrap: wrap;
 }
-.reading-controls .icon-button {
-    font-weight: bold;
+
+.popup-controls label, .popup-controls span {
+    font-size: 14px;
+    color: var(--text-color);
+    white-space: nowrap;
 }
-.comment-sort-controls .dropdown-input,
-.translation-controls .dropdown-input {
+.popup-controls .action-button, .popup-controls .dropdown-input, .popup-controls .icon-button {
     padding: 8px 12px;
     font-size: 14px;
-    width: auto;
+    border-radius: 20px;
+    min-width: 0;
+    box-shadow: none;
+    margin: 0;
 }
+.popup-controls .icon-button {
+    border: 1px solid var(--border-color);
+}
+.popup-main-actions .narration-controls {
+    display: flex;
+    gap: 5px;
+}
+
 
 .popup-body {
     font-size: var(--popup-font-size);
@@ -1020,6 +1057,15 @@ body.loaded {
     color: var(--text-color);
     padding: 0 20px 20px 20px;
 }
+
+.popup-body .markdown-content {
+    max-width: 75ch;
+    margin-left: auto;
+    margin-right: auto;
+    text-align: justify;
+    hyphens: auto;
+}
+
 
 .popup-media {
     width: 100%;
@@ -1677,7 +1723,7 @@ input:checked + .slider:before { transform: translateX(26px); }
         padding: 0;
         max-height: 95vh;
     }
-    .popup-header, .popup-controls, .popup-body {
+    .popup-header, .popup-body {
         padding-left: 15px;
         padding-right: 15px;
     }
@@ -1688,19 +1734,11 @@ input:checked + .slider:before { transform: translateX(26px); }
     }
 
     .popup-controls {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 15px;
+        padding: 15px;
     }
 
-    .popup-actions-left, .popup-actions-right {
-        width: 100%;
+    .popup-main-actions,
+    .popup-secondary-controls {
         justify-content: space-around;
     }
-    
-    .narration-controls, .translation-controls, .reading-controls, .comment-sort-controls {
-        width: 100%;
-        justify-content: space-between;
-    }
-
 }

@@ -511,14 +511,32 @@ window.addEventListener('load', () => {
                 const info = data.data;
         
                 const fullDescription = info.public_description || '';
-                let isTruncated = false;
-                let shortDescription = fullDescription;
+                
+                // Regex to find the end of the first sentence (. ! ?) followed by a space or end of string.
+                const sentenceEndRegex = /[.!?](?=\s|$)/;
+                const match = sentenceEndRegex.exec(fullDescription);
         
-                // Truncate only if the description is long and contains a period.
-                const firstSentenceIndex = fullDescription.indexOf('.');
-                if (firstSentenceIndex !== -1 && fullDescription.length > 200) { 
-                    shortDescription = fullDescription.substring(0, firstSentenceIndex + 1);
-                    isTruncated = shortDescription.length < fullDescription.length;
+                let firstSentenceIndex = -1;
+                if (match) {
+                    // The index of the matched punctuation mark.
+                    firstSentenceIndex = match.index;
+                }
+        
+                // Check if there is text after the first sentence to determine if truncation is needed.
+                const isTruncated = firstSentenceIndex !== -1 && fullDescription.length > firstSentenceIndex + 2;
+        
+                let descriptionHTML = '';
+                if (isTruncated) {
+                    const firstSentence = fullDescription.substring(0, firstSentenceIndex + 1);
+                    const restOfDescription = fullDescription.substring(firstSentenceIndex + 1).trim();
+                    descriptionHTML = `
+                        <p class="subreddit-description">
+                            ${renderMarkdown(firstSentence)}<span id="more-description-content" style="display: none;"> ${renderMarkdown(restOfDescription)}</span>
+                        </p>
+                        <button id="toggle-description-button" class="action-button secondary small">Show More</button>
+                    `;
+                } else {
+                    descriptionHTML = `<p class="subreddit-description">${renderMarkdown(fullDescription)}</p>`;
                 }
         
                 subredditInfoPanel.innerHTML = `
@@ -529,22 +547,20 @@ window.addEventListener('load', () => {
                             <span class="subreddit-stats">${(info.subscribers || 0).toLocaleString()} members</span>
                         </div>
                         <div class="subreddit-description-container">
-                            <p class="subreddit-description">${renderMarkdown(shortDescription)}</p>
-                            ${isTruncated ? '<button id="toggle-description-button" class="action-button secondary small">Read More</button>' : ''}
+                            ${descriptionHTML}
                         </div>
                     </div>
                 `;
         
                 if (isTruncated) {
-                    // Scope the search for the button and paragraph to within the panel
                     const toggleButton = subredditInfoPanel.querySelector('#toggle-description-button');
-                    const descriptionP = subredditInfoPanel.querySelector('.subreddit-description');
+                    const moreContentSpan = subredditInfoPanel.querySelector('#more-description-content');
                     
-                    if (toggleButton && descriptionP) {
+                    if (toggleButton && moreContentSpan) {
                         toggleButton.addEventListener('click', () => {
-                            const isShowingShort = toggleButton.textContent === 'Read More';
-                            descriptionP.innerHTML = renderMarkdown(isShowingShort ? fullDescription : shortDescription);
-                            toggleButton.textContent = isShowingShort ? 'Show Less' : 'Read More';
+                            const isHidden = moreContentSpan.style.display === 'none';
+                            moreContentSpan.style.display = isHidden ? 'inline' : 'none';
+                            toggleButton.textContent = isHidden ? 'Show Less' : 'Show More';
                         });
                     }
                 }
@@ -654,17 +670,17 @@ window.addEventListener('load', () => {
             });
             
             popupControls.innerHTML = `
-                <div class="popup-actions-left">
+                <div class="popup-main-actions">
                     <button id="summarize-button" class="action-button secondary">Summarize</button>
                     <button id="word-cloud-button" class="action-button secondary">Word Cloud</button>
                     <button id="live-comments-button" class="action-button secondary">Live Comments</button>
-                </div>
-                <div class="popup-actions-right">
                     <div class="narration-controls">
                         <button id="narrate-button" class="action-button secondary">Narrate Story</button>
                         <button id="stop-narration-button" class="action-button danger" style="display:none;">Stop</button>
                     </div>
-                     <div class="translation-controls">
+                </div>
+                <div class="popup-secondary-controls">
+                    <div class="translation-controls">
                         <label for="translation-select">Translate:</label>
                         <select id="translation-select" class="dropdown-input">
                             <option value="">Original</option>
@@ -1597,22 +1613,39 @@ window.addEventListener('load', () => {
         }
         
         function handlePopupBodyClick(e) {
-            const collapseButton = e.target.closest('.collapse-comment');
+            // Find the closest comment card to the click target
+            const commentCard = e.target.closest('.comment-card');
+            
+            // If the click is not inside a comment card, do nothing related to comments.
+            if (!commentCard) {
+                 // Handle tag removal, which is outside the comment card structure
+                const removeTagBtn = e.target.closest('.remove-tag');
+                if(removeTagBtn) {
+                    const tag = removeTagBtn.parentElement.dataset.tag;
+                    removeTagFromStory(currentStoryId, tag);
+                }
+                return;
+            }
+    
+            // --- Check for clicks on specific interactive elements inside the card ---
+            // If a link was clicked, let it perform its action and DO NOT toggle the comment.
+            // This includes author links and any links in the comment body.
+            if (e.target.closest('a')) {
+                // Handle author link click specifically to fetch profile
+                if (e.target.closest('.author-link')) {
+                     e.preventDefault();
+                     const author = e.target.closest('.author-link').textContent.replace('u/', '');
+                     fetchUserProfile(author);
+                }
+                // For any other link, just return and let the browser's default behavior handle it.
+                return; 
+            }
+    
+            // --- If none of the above interactive elements were clicked, toggle the card ---
+            const isCollapsed = commentCard.classList.toggle('collapsed');
+            const collapseButton = commentCard.querySelector('.collapse-comment');
             if (collapseButton) {
-                const commentCard = collapseButton.closest('.comment-card');
-                const isCollapsed = commentCard.classList.toggle('collapsed');
                 collapseButton.textContent = isCollapsed ? '[+]' : '[–]';
-            }
-            const authorLink = e.target.closest('.author-link');
-            if(authorLink) {
-                e.preventDefault();
-                const author = authorLink.textContent.replace('u/', '');
-                fetchUserProfile(author);
-            }
-            const removeTagBtn = e.target.closest('.remove-tag');
-            if(removeTagBtn) {
-                const tag = removeTagBtn.parentElement.dataset.tag;
-                removeTagFromStory(currentStoryId, tag);
             }
         }
         
