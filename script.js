@@ -272,7 +272,7 @@ window.addEventListener('load', () => {
         // --- Functions ---
         function applyTheme(theme) {
             // Remove only theme-related classes, preserving others like 'loaded'
-            document.body.classList.remove('dark', 'sepia');
+            document.body.classList.remove('dark', 'sepia', 'slate', 'forest', 'solarized-light', 'dracula');
             
             // Add the new theme class if it's not the default light theme
             if (theme !== 'light') {
@@ -2699,4 +2699,3 @@ window.addEventListener('load', () => {
         document.body.innerHTML = "<h1>A critical error occurred. Please refresh the page.</h1>";
     }
 });
-

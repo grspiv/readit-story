@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Reddit Storyteller</title>
-    <!-- External libraries are kept in the head to be loaded early -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/d3-cloud@1/build/d3.layout.cloud.js"></script>
@@ -21,6 +20,10 @@
                     <option value="light">Light</option>
                     <option value="dark">Dark</option>
                     <option value="sepia">Sepia</option>
+                    <option value="slate">Slate</option>
+                    <option value="forest">Forest</option>
+                    <option value="solarized-light">Solarized Light</option>
+                    <option value="dracula">Dracula</option>
                 </select>
             </div>
             <div class="filter-switch">
@@ -189,7 +192,6 @@
         </div>
     </main>
     
-    <!-- Story Reader Popup -->
     <div id="popup-overlay" class="popup-overlay" role="dialog" aria-modal="true" aria-labelledby="popup-title">
         <div class="popup-content">
             <div id="reading-progress-bar" class="reading-progress-bar"></div>
@@ -224,7 +226,6 @@
         <button id="gallery-next" class="gallery-nav next" style="display: none;" aria-label="Next image">&#10095;</button>
     </div>
 
-    <!-- User Profile Popup -->
     <div id="user-profile-overlay" class="popup-overlay" role="dialog" aria-modal="true" aria-labelledby="user-profile-title">
          <div class="popup-content">
              <header class="popup-header">
@@ -241,7 +242,6 @@
          </div>
     </div>
 
-    <!-- Word Cloud Popup -->
     <div id="word-cloud-overlay" class="popup-overlay" role="dialog" aria-modal="true" aria-labelledby="word-cloud-title">
          <div class="popup-content">
              <header class="popup-header">
@@ -261,7 +261,6 @@
          </div>
     </div>
 
-    <!-- API Key Popup -->
     <div id="api-key-overlay" class="popup-overlay" role="dialog" aria-modal="true" aria-labelledby="api-key-title">
         <div class="popup-content">
             <header class="popup-header">
@@ -297,4 +296,3 @@
     <script src="script.js"></script>
 </body>
 </html>
-

@@ -5,6 +5,7 @@
     --heading-color: #2c3e50;
     --button-color: #e74c3c;
     --button-hover-color: #c0392b;
+    --button-text-color: #fff;
     --border-color: #ecf0f1;
     --shadow-color: rgba(44, 62, 80, 0.15);
     --highlight-color: #3498db;
@@ -38,6 +39,60 @@ body.sepia {
     --border-color: #d1c7b7;
     --shadow-color: rgba(88, 80, 64, 0.2);
 }
+
+body.slate {
+    --bg-color: #1a202c;
+    --card-bg: #2d3748;
+    --text-color: #e2e8f0;
+    --heading-color: #ffffff;
+    --button-color: #38b2ac;
+    --button-hover-color: #319795;
+    --border-color: #4a5568;
+    --shadow-color: rgba(0, 0, 0, 0.5);
+    --highlight-color: #63b3ed;
+    --accent-color: #9f7aea;
+}
+
+body.forest {
+    --bg-color: #1A3636;
+    --card-bg: #40534C;
+    --text-color: #D6BD98;
+    --heading-color: #F2E3DB;
+    --button-color: #D6BD98;
+    --button-hover-color: #B0926A;
+    --button-text-color: #1A3636;
+    --border-color: #677D6A;
+    --shadow-color: rgba(0, 0, 0, 0.45);
+    --highlight-color: #677D6A;
+    --accent-color: #9DBC98;
+}
+
+body.solarized-light {
+    --bg-color: #fdf6e3;
+    --card-bg: #eee8d5;
+    --text-color: #657b83;
+    --heading-color: #073642;
+    --button-color: #dc322f;
+    --button-hover-color: #cb4b16;
+    --border-color: #93a1a1;
+    --shadow-color: rgba(101, 123, 131, 0.2);
+    --highlight-color: #268bd2;
+    --accent-color: #6c71c4;
+}
+
+body.dracula {
+    --bg-color: #282a36;
+    --card-bg: #44475a;
+    --text-color: #f8f8f2;
+    --heading-color: #bd93f9;
+    --button-color: #ff79c6;
+    --button-hover-color: #ff92d0;
+    --border-color: #6272a4;
+    --shadow-color: rgba(0, 0, 0, 0.5);
+    --highlight-color: #8be9fd;
+    --accent-color: #ffb86c;
+}
+
 
 *, *::before, *::after {
     box-sizing: border-box;
@@ -83,24 +138,25 @@ body.loaded {
 }
 
 .app-header {
-    background: linear-gradient(135deg, var(--highlight-color), var(--accent-color));
-    color: white;
+    background: var(--card-bg);
+    color: var(--heading-color);
     padding: 20px;
     text-align: center;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-    margin-bottom: 0;
+    box-shadow: 0 2px 4px var(--shadow-color);
+    margin-bottom: 20px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     flex-wrap: wrap;
     gap: 15px;
+    border-bottom: 1px solid var(--border-color);
 }
 
 .app-header h1 {
     margin: 0;
     font-size: clamp(1.8rem, 5vw, 2.5rem);
     letter-spacing: 2px;
-    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+    text-shadow: none;
     width: 100%;
     text-align: center;
 }
@@ -115,17 +171,20 @@ body.loaded {
 }
 
 .layout-controls .icon-button {
-    background-color: rgba(255, 255, 255, 0.2);
-    color: white;
+    background-color: var(--bg-color);
+    color: var(--text-color);
     border-radius: 50%;
     width: 40px;
     height: 40px;
     display: flex;
     justify-content: center;
     align-items: center;
+    border: 1px solid var(--border-color);
 }
 .layout-controls .icon-button.active {
-    background-color: rgba(255, 255, 255, 0.4);
+    background-color: var(--highlight-color);
+    color: var(--button-text-color);
+    border-color: var(--highlight-color);
 }
 
 
@@ -313,7 +372,7 @@ body.loaded {
 
 .action-button {
     background-color: var(--button-color);
-    color: white;
+    color: var(--button-text-color);
     padding: 12px 25px;
     border: none;
     border-radius: 25px;
@@ -605,7 +664,7 @@ body.loaded {
 
 .read-button, .save-button {
     background-color: var(--button-color);
-    color: white;
+    color: var(--button-text-color);
     padding: 10px 18px;
     border: none;
     border-radius: 20px;
@@ -1629,4 +1688,3 @@ input:checked + .slider:before { transform: translateX(26px); }
     }
 
 }
-
