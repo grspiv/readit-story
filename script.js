@@ -112,6 +112,7 @@ window.addEventListener('load', () => {
         let apiKeyPromiseReject = null;
         let originalStoryContent = null;
         let currentStorySummary = null;
+        let currentStoryELI5 = null;
         let currentStoryTranslations = {};
         let sentimentCache = {};
         
@@ -476,6 +477,7 @@ window.addEventListener('load', () => {
             currentStoryId = null;
             originalStoryContent = null;
             currentStorySummary = null;
+            currentStoryELI5 = null;
             currentStoryTranslations = {};
             narrationAudioCache = {}; 
         }
@@ -2432,6 +2434,22 @@ window.addEventListener('load', () => {
                 return;
             }
             
+            // --- Caching Fix Start ---
+            const cachedResult = (mode === 'summarize') ? currentStorySummary : currentStoryELI5;
+            if (cachedResult) {
+                if (!originalStoryContent) {
+                    originalStoryContent = storyContentWrapper.innerHTML;
+                }
+                const outputContainer = document.createElement('div');
+                outputContainer.className = 'ai-output-box';
+                outputContainer.innerHTML = `<h4>${titleText}</h4><div class="markdown-content">${renderMarkdown(cachedResult)}</div>`;
+                storyContentWrapper.innerHTML = '';
+                storyContentWrapper.appendChild(outputContainer);
+                button.textContent = 'Show Original';
+                return; // Use cached version and exit
+            }
+            // --- Caching Fix End ---
+
             button.disabled = true;
             button.textContent = 'Generating...';
             originalStoryContent = storyContentWrapper.innerHTML;
@@ -2463,6 +2481,14 @@ window.addEventListener('load', () => {
                 
                 liveContent.innerHTML = renderMarkdown(fullText);
                 button.textContent = 'Show Original';
+                
+                // --- Caching Fix Start ---
+                if (mode === 'summarize') {
+                    currentStorySummary = fullText;
+                } else { // eli5
+                    currentStoryELI5 = fullText;
+                }
+                // --- Caching Fix End ---
 
             } catch (error) {
                 storyContentWrapper.innerHTML = originalStoryContent;
@@ -2517,9 +2543,14 @@ window.addEventListener('load', () => {
                     storyContentWrapper.innerHTML = originalStoryContent;
                     originalStoryContent = null;
                 }
-                document.getElementById('summarize-button').textContent = 'Summarize';
-                document.getElementById('eli5-button').textContent = 'ELI5';
+                // Reset summarize/ELI5 buttons if they were active
+                const summarizeButton = document.getElementById('summarize-button');
+                const eli5Button = document.getElementById('eli5-button');
+                if(summarizeButton) summarizeButton.textContent = 'Summarize';
+                if(eli5Button) eli5Button.textContent = 'ELI5';
+                
                 currentStorySummary = null;
+                currentStoryELI5 = null;
                 return;
             }
 

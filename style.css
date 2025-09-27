@@ -147,7 +147,7 @@ body {
     transition: background-color 0.3s ease, color 0.3s ease;
     -webkit-tap-highlight-color: transparent; /* Disable tap highlight on iOS */
     -webkit-font-smoothing: antialiased;
-    word-break: break-word;
+    overflow-wrap: break-word; /* Replaced word-break for better text handling */
 }
 
 body.loaded {
@@ -643,7 +643,7 @@ body.loaded {
     font-size: 1.3em;
     color: var(--heading-color);
     margin: 0 0 5px;
-    word-break: break-word; /* Prevent long titles from overflowing */
+    overflow-wrap: break-word; /* Prevent long titles from overflowing */
 }
 
 .story-card h3 a {
@@ -1059,7 +1059,7 @@ body.loaded {
     color: var(--heading-color);
     margin: 0;
     padding-right: 15px;
-    word-break: break-word;
+    overflow-wrap: break-word; /* FIX: Changed from word-break for better wrapping on mobile */
 }
 
 .popup-subreddit-link {
@@ -1287,7 +1287,7 @@ body.loaded {
 .comment-body {
     margin: 0;
     white-space: pre-wrap;
-    word-break: break-word;
+    overflow-wrap: break-word;
 }
 
 .load-more-comments-container {
@@ -1769,8 +1769,9 @@ input:checked + .slider:before { transform: translateX(26px); }
 
 
 @media (max-width: 1024px) {
+    /* FIX: Make the controls container static on mobile so it doesn't stick to the top */
     .controls-container {
-        position: static; /* Change from sticky to static on mobile */
+        position: static; 
         padding: 15px;
     }
 
