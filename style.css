@@ -147,7 +147,7 @@ body {
     transition: background-color 0.3s ease, color 0.3s ease;
     -webkit-tap-highlight-color: transparent; /* Disable tap highlight on iOS */
     -webkit-font-smoothing: antialiased;
-    overflow-wrap: break-word; /* Replaced word-break for better text handling */
+    overflow-wrap: break-word;
 }
 
 body.loaded {
@@ -908,41 +908,6 @@ body.loaded {
     margin-right: 5px;
 }
 
-#playlist-items-container .playlist-item {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-    padding: 12px;
-    border-bottom: 1px solid var(--border-color);
-    transition: background-color 0.3s ease;
-}
-#playlist-items-container .playlist-item:last-child {
-    border-bottom: none;
-}
-.playlist-item.playing {
-    background-color: rgba(var(--highlight-color-rgb), 0.15);
-}
-.playlist-item.playing .playlist-item-title::before {
-    content: '▶';
-    margin-right: 10px;
-    color: var(--highlight-color);
-}
-.playlist-item-info {
-    flex-grow: 1;
-    min-width: 0; /* Prevents text overflow issues */
-}
-.playlist-item-title {
-    font-weight: bold;
-    color: var(--heading-color);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-.playlist-item-author {
-    font-size: 0.9em;
-    opacity: 0.7;
-}
-
 /* --- END: NEW FEATURE STYLES --- */
 
 .crosspost-info {
@@ -1059,7 +1024,7 @@ body.loaded {
     color: var(--heading-color);
     margin: 0;
     padding-right: 15px;
-    overflow-wrap: break-word; /* FIX: Changed from word-break for better wrapping on mobile */
+    overflow-wrap: break-word;
 }
 
 .popup-subreddit-link {
@@ -1769,9 +1734,8 @@ input:checked + .slider:before { transform: translateX(26px); }
 
 
 @media (max-width: 1024px) {
-    /* FIX: Make the controls container static on mobile so it doesn't stick to the top */
     .controls-container {
-        position: static; 
+        position: static;
         padding: 15px;
     }
 
