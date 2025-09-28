@@ -60,57 +60,59 @@
     
     <main class="main-content">
         <section id="controls-container" class="controls-container">
-            <div class="controls">
-                <div class="input-group main-input">
-                    <label for="subreddit-input">Subreddit (use + for multi):</label>
-                    <input type="text" id="subreddit-input" list="subreddit-list" value="AskReddit" class="text-input" aria-label="Subreddit input">
-                    <datalist id="subreddit-list"></datalist>
+            <form id="search-form" action="javascript:void(0);">
+                <div class="controls">
+                    <div class="input-group main-input">
+                        <label for="subreddit-input">Subreddit (use + for multi):</label>
+                        <input type="text" id="subreddit-input" list="subreddit-list" value="AskReddit" class="text-input" aria-label="Subreddit input">
+                        <datalist id="subreddit-list"></datalist>
+                    </div>
+                    <div class="input-group main-input search-container">
+                        <label for="search-input">Search within Subreddit:</label>
+                        <input type="text" id="search-input" class="text-input" placeholder="Enter keywords..." aria-label="Search within subreddit">
+                        <button id="clear-search-button" class="clear-search-btn" style="display: none;" aria-label="Clear search input">&times;</button>
+                    </div>
+                    <button id="fetch-button" type="submit" class="action-button">Get Stories</button>
+                    <button id="toggle-filters-button" type="button" class="action-button secondary icon-button" title="Toggle Filters" aria-label="Toggle advanced filters">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46V19l4 2v-8.54L22 3z"></polygon></svg>
+                    </button>
                 </div>
-                <div class="input-group main-input search-container">
-                    <label for="search-input">Search within Subreddit:</label>
-                    <input type="text" id="search-input" class="text-input" placeholder="Enter keywords..." aria-label="Search within subreddit">
-                    <button id="clear-search-button" class="clear-search-btn" style="display: none;" aria-label="Clear search input">&times;</button>
+                <div id="advanced-filters" class="advanced-filters">
+                    <div class="input-group">
+                        <label for="sort-select">Sort by:</label>
+                        <select id="sort-select" class="dropdown-input" aria-label="Sort stories by">
+                            <option value="hot">Hot</option>
+                            <option value="new">New</option>
+                            <option value="top">Top</option>
+                            <option value="rising">Rising</option>
+                        </select>
+                    </div>
+                     <div class="input-group" id="time-range-controls" style="display: none;">
+                        <label for="time-range-select">Time Range:</label>
+                        <select id="time-range-select" class="dropdown-input" aria-label="Select time range for top stories">
+                            <option value="all">All Time</option>
+                            <option value="year">Past Year</option>
+                            <option value="month">Past Month</option>
+                            <option value="week">Past Week</option>
+                            <option value="day">Past 24 Hours</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label for="flair-filter-input">Filter by Flair:</label>
+                        <input type="text" id="flair-filter-input" class="text-input" placeholder="e.g., 'Update', 'Series'" aria-label="Filter stories by flair">
+                    </div>
+                    <div class="input-group">
+                        <label for="min-score-input">Min Score:</label>
+                        <input type="number" id="min-score-input" class="text-input" placeholder="e.g., 1000" aria-label="Filter stories by minimum score">
+                    </div>
+                    <div class="input-group">
+                        <label for="min-comments-input">Min Comments:</label>
+                        <input type="number" id="min-comments-input" class="text-input" placeholder="e.g., 50" aria-label="Filter stories by minimum comments">
+                    </div>
+                    <button id="random-button" type="button" class="action-button secondary">Random Subreddit</button>
+                    <button id="surprise-button" type="button" class="action-button secondary surprise">Surprise Me!</button>
                 </div>
-                <button id="fetch-button" class="action-button">Get Stories</button>
-                <button id="toggle-filters-button" class="action-button secondary icon-button" title="Toggle Filters" aria-label="Toggle advanced filters">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46V19l4 2v-8.54L22 3z"></polygon></svg>
-                </button>
-            </div>
-            <div id="advanced-filters" class="advanced-filters">
-                <div class="input-group">
-                    <label for="sort-select">Sort by:</label>
-                    <select id="sort-select" class="dropdown-input" aria-label="Sort stories by">
-                        <option value="hot">Hot</option>
-                        <option value="new">New</option>
-                        <option value="top">Top</option>
-                        <option value="rising">Rising</option>
-                    </select>
-                </div>
-                 <div class="input-group" id="time-range-controls" style="display: none;">
-                    <label for="time-range-select">Time Range:</label>
-                    <select id="time-range-select" class="dropdown-input" aria-label="Select time range for top stories">
-                        <option value="all">All Time</option>
-                        <option value="year">Past Year</option>
-                        <option value="month">Past Month</option>
-                        <option value="week">Past Week</option>
-                        <option value="day">Past 24 Hours</option>
-                    </select>
-                </div>
-                <div class="input-group">
-                    <label for="flair-filter-input">Filter by Flair:</label>
-                    <input type="text" id="flair-filter-input" class="text-input" placeholder="e.g., 'Update', 'Series'" aria-label="Filter stories by flair">
-                </div>
-                <div class="input-group">
-                    <label for="min-score-input">Min Score:</label>
-                    <input type="number" id="min-score-input" class="text-input" placeholder="e.g., 1000" aria-label="Filter stories by minimum score">
-                </div>
-                <div class="input-group">
-                    <label for="min-comments-input">Min Comments:</label>
-                    <input type="number" id="min-comments-input" class="text-input" placeholder="e.g., 50" aria-label="Filter stories by minimum comments">
-                </div>
-                <button id="random-button" class="action-button secondary">Random Subreddit</button>
-                <button id="surprise-button" class="action-button secondary surprise">Surprise Me!</button>
-            </div>
+            </form>
         </section>
 
         <nav class="action-bar">

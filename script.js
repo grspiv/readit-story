@@ -1,6 +1,7 @@
 window.addEventListener('load', () => {
     try {
         // --- DOM Elements ---
+        const searchForm = document.getElementById('search-form');
         const fetchButton = document.getElementById('fetch-button');
         const randomButton = document.getElementById('random-button');
         const surpriseButton = document.getElementById('surprise-button');
@@ -141,7 +142,13 @@ window.addEventListener('load', () => {
         layoutSelect.addEventListener('change', () => applyLayout(layoutSelect.value));
         galleryToggleButton.addEventListener('click', handleGalleryToggle);
         nsfwToggle.addEventListener('change', () => applyNSFWPreference(nsfwToggle.checked, true));
-        fetchButton.addEventListener('click', () => switchToView('browsing', { refresh: true }));
+        
+        // Use a single form submit listener for reliability on all devices
+        searchForm.addEventListener('submit', (e) => {
+            e.preventDefault(); // Prevent page reload
+            switchToView('browsing', { refresh: true });
+        });
+
         randomButton.addEventListener('click', handleRandomClick);
         surpriseButton.addEventListener('click', handleSurpriseClick);
         sortSelect.addEventListener('change', handleSortChange);
@@ -162,20 +169,6 @@ window.addEventListener('load', () => {
         
         searchInput.addEventListener('input', () => {
             clearSearchButton.style.display = searchInput.value ? 'block' : 'none';
-        });
-        
-        // Handle Enter key submission from input fields
-        subredditInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault(); // Prevent any default form submission behavior
-                fetchButton.click(); // Trigger the button click to run the search
-            }
-        });
-        searchInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                fetchButton.click();
-            }
         });
 
         clearSearchButton.addEventListener('click', () => {
@@ -531,17 +524,14 @@ window.addEventListener('load', () => {
         
                 const fullDescription = info.public_description || '';
                 
-                // Regex to find the end of the first sentence (. ! ?) followed by a space or end of string.
                 const sentenceEndRegex = /[.!?](?=\s|$)/;
                 const match = sentenceEndRegex.exec(fullDescription);
         
                 let firstSentenceIndex = -1;
                 if (match) {
-                    // The index of the matched punctuation mark.
                     firstSentenceIndex = match.index;
                 }
         
-                // Check if there is text after the first sentence to determine if truncation is needed.
                 const isTruncated = firstSentenceIndex !== -1 && fullDescription.length > firstSentenceIndex + 2;
         
                 let descriptionHTML = '';
@@ -654,7 +644,7 @@ window.addEventListener('load', () => {
         }
 
         async function fetchAndShowComments(story) {
-            closePopup(); // Close any existing popups and clear all caches.
+            closePopup();
 
             popupBody.innerHTML = '';
 
@@ -798,7 +788,6 @@ window.addEventListener('load', () => {
             downloadBtn.onclick = () => downloadStory(story);
             headerActions.appendChild(downloadBtn);
 
-            // Handle notes & tags section for saved stories
             if (isStorySaved(story.id)) {
                 savedStoryNotesContainer.style.display = 'block';
                 savedStoryTagsContainer.style.display = 'block';
@@ -811,8 +800,8 @@ window.addEventListener('load', () => {
 
             document.body.style.overflow = 'hidden';
             popupOverlay.classList.add('active');
-            popupBody.scrollTop = 0; // Reset scroll position
-            handlePopupScroll(); // Update progress bar
+            popupBody.scrollTop = 0;
+            handlePopupScroll();
             
             if (storyContainer.classList.contains('gallery-view')) {
                 galleryPrevButton.style.display = 'block';
@@ -841,11 +830,9 @@ window.addEventListener('load', () => {
             popupBody.innerHTML = finalContent;
 
             await fetchCommentsForCurrentStory('confidence');
-            restoreReadingPosition(story.id); // Restore position after content is loaded
+            restoreReadingPosition(story.id);
             findSeries(story);
         }
-
-        // ... This is the end of the changed section. The rest of the file follows. ...
 
         async function fetchCommentsForCurrentStory(sort) {
             const story = allFetchedPosts.find(p => p.id === currentStoryId) || getHistory().find(p => p.id === currentStoryId) || getSavedStories().find(p => p.id === currentStoryId);
@@ -1103,7 +1090,6 @@ window.addEventListener('load', () => {
 
             const redditLink = `https://www.reddit.com${story.permalink}`;
 
-            // Handle specific button clicks
             if (e.target.closest('.read-button')) {
                 e.stopPropagation();
                 fetchAndShowComments(story);
@@ -1128,7 +1114,6 @@ window.addEventListener('load', () => {
                 // Let links behave normally
             }
             else {
-                // If the card itself is clicked (but not a button/link)
                 fetchAndShowComments(story);
             }
         }
@@ -1199,7 +1184,6 @@ window.addEventListener('load', () => {
         
         function renderMarkdown(text) {
             if (!text) return '';
-            // Decode HTML entities that Reddit sometimes uses in markdown text
             const tempTextArea = document.createElement('textarea');
             tempTextArea.innerHTML = text;
             const decodedText = tempTextArea.value;
@@ -2205,7 +2189,6 @@ window.addEventListener('load', () => {
             let x = e.clientX + offsetX;
             let y = e.clientY + offsetY;
             
-            // Prevent going off-screen
             if (x + quickLookPopup.offsetWidth > window.innerWidth) {
                 x = e.clientX - quickLookPopup.offsetWidth - offsetX;
             }
@@ -2321,7 +2304,6 @@ window.addEventListener('load', () => {
                 if (candidate && candidate.content?.parts?.[0]?.text) {
                     return candidate.content.parts[0].text;
                 } else {
-                    // Handle cases where the response structure is unexpected or content is missing
                     console.warn("Unexpected API response structure:", result);
                     if (candidate && candidate.finishReason !== 'STOP') {
                          throw new Error(`Generation stopped for reason: ${candidate.finishReason}`);
@@ -2523,7 +2505,6 @@ window.addEventListener('load', () => {
                     storyContentWrapper.innerHTML = originalStoryContent;
                     originalStoryContent = null;
                 }
-                // Reset summarize/ELI5 buttons if they were active
                 const summarizeButton = document.getElementById('summarize-button');
                 const eli5Button = document.getElementById('eli5-button');
                 if(summarizeButton) summarizeButton.textContent = 'Summarize';
@@ -2790,7 +2771,6 @@ window.addEventListener('load', () => {
             writeString(view, 36, 'data');
             view.setUint32(40, dataSize, true);
 
-            // Write PCM data
             for (let i = 0; i < pcmData.length; i++) {
                 view.setInt16(44 + i * 2, pcmData[i], true);
             }
@@ -2809,9 +2789,9 @@ window.addEventListener('load', () => {
             if (!story) return;
 
             const badge = document.querySelector(`.sentiment-badge[data-story-id="${story.id}"]`);
-            if (!badge || badge.textContent) return; // Already analyzed or in progress
+            if (!badge || badge.textContent) return;
             
-            badge.textContent = '...'; // Indicate loading
+            badge.textContent = '...';
 
             if (sentimentCache[story.id]) {
                 displaySentimentBadge(story.id, sentimentCache[story.id]);
@@ -2850,7 +2830,7 @@ window.addEventListener('load', () => {
             } catch (error) {
                 console.error(`Could not get sentiment for story ${story.id}:`, error);
                 delete sentimentCache[story.id];
-                 if(badge) badge.textContent = ''; // Clear loading indicator on error
+                 if(badge) badge.textContent = '';
             }
         }
 
