@@ -244,11 +244,8 @@ window.addEventListener('load', () => {
                 if(markAllReadButton) markAllReadButton.style.display = 'flex';
                 
                 if (options && options.refresh) {
-                    // Robust multireddit input sanitation
-                    let subreddit = subredditInput.value.trim();
-                    subreddit = subreddit.replace(/\s*\+\s*/g, '+'); // Consolidate space around +
-                    subreddit = subreddit.replace(/\++/g, '+');       // Replace multiple ++ with a single +
-                    subreddit = subreddit.replace(/^\+|\+$/g, '');   // Remove leading/trailing +
+                    // **FIX:** Use unified sanitizer for multireddit input
+                    const subreddit = sanitizeSubredditInput(subredditInput.value);
                     subredditInput.value = subreddit; // Update input field with sanitized value
                     
                     const sort = sortSelect.value;
@@ -266,8 +263,12 @@ window.addEventListener('load', () => {
                     renderFilteredStories();
                     const query = searchInput.value.trim();
                     storiesHeading.textContent = query ? `Searching for "${query}" in r/${subredditInput.value}` : `Showing stories from r/${subredditInput.value}`;
-                    if (!subredditInput.value.includes('+') && !query) {
-                        subredditInfoPanel.style.display = 'flex';
+                    
+                    const isMultiReddit = subredditInput.value.includes('+');
+                    const isSearch = query.length > 0;
+
+                    if (!isSearch) {
+                         subredditInfoPanel.style.display = 'flex';
                     } else {
                          subredditInfoPanel.style.display = 'none';
                     }
@@ -286,6 +287,23 @@ window.addEventListener('load', () => {
         }
 
         // --- Functions ---
+        
+        /**
+         * **FIX:** Centralized function to sanitize multireddit strings.
+         * This ensures consistent behavior for initial searches and "load more" actions.
+         * @param {string} input The raw subreddit input string.
+         * @returns {string} A cleaned string (e.g., "python+learnpython").
+         */
+        function sanitizeSubredditInput(input) {
+            if (!input) return '';
+            return input
+                .trim()
+                .split('+')
+                .map(s => s.trim())
+                .filter(Boolean) // Removes empty strings from "++" or " + "
+                .join('+');
+        }
+
         function applyTheme(theme) {
             // Remove all possible theme classes, preserving essential layout classes
             document.body.classList.remove('dark', 'sepia', 'slate', 'forest', 'solarized-light', 'dracula', 'kaydoh', 'kizzie');
@@ -406,12 +424,8 @@ window.addEventListener('load', () => {
         }
 
         function handleLoadMore() {
-            // Robust multireddit input sanitation
-            let subreddit = subredditInput.value.trim();
-            subreddit = subreddit.replace(/\s*\+\s*/g, '+'); // Consolidate space around +
-            subreddit = subreddit.replace(/\++/g, '+');       // Replace multiple ++ with a single +
-            subreddit = subreddit.replace(/^\+|\+$/g, '');   // Remove leading/trailing +
-            
+            // **FIX:** Use unified sanitizer for multireddit input
+            const subreddit = sanitizeSubredditInput(subredditInput.value);
             const sort = sortSelect.value;
             const timeRange = timeRangeSelect.value;
 
@@ -575,8 +589,57 @@ window.addEventListener('load', () => {
                 }
         
                 subredditInfoPanel.style.display = 'flex';
+                subredditInfoPanel.style.flexWrap = 'nowrap';
             } catch (error) {
                 console.error("Failed to display subreddit info:", error);
+                subredditInfoPanel.style.display = 'none';
+            }
+        }
+
+        async function fetchMultiSubredditInfo(subreddits) {
+            subredditInfoPanel.innerHTML = ''; // Clear previous content
+            subredditInfoPanel.style.display = 'flex';
+            subredditInfoPanel.style.flexWrap = 'wrap'; 
+            subredditInfoPanel.style.gap = '15px'; 
+
+            const promises = subreddits.map(sub => 
+                fetch(`${REDDIT_API_BASE_URL}r/${sub}/about.json`)
+                    .then(res => res.ok ? res.json() : null) // Return null on error to not break Promise.all
+            );
+
+            try {
+                const results = await Promise.all(promises);
+                const infos = results.filter(Boolean).map(data => data.data); // Filter out failed requests
+
+                if (infos.length === 0) {
+                    subredditInfoPanel.style.display = 'none';
+                    return;
+                }
+
+                const infoHTML = infos.map(info => `
+                    <div class="multi-subreddit-item">
+                        <img src="${info.community_icon || info.icon_img || 'https://placehold.co/40x40/e74c3c/fff?text=R'}" alt="${info.display_name_prefixed} Icon" class="subreddit-icon-small">
+                        <div class="multi-subreddit-details">
+                            <a href="#" data-subreddit="${info.display_name}" class="multi-subreddit-link">${info.display_name_prefixed}</a>
+                            <span class="subreddit-stats-small">${(info.subscribers || 0).toLocaleString()} members</span>
+                        </div>
+                    </div>
+                `).join('');
+
+                subredditInfoPanel.innerHTML = infoHTML;
+                
+                // Add event listeners for the new links
+                subredditInfoPanel.querySelectorAll('.multi-subreddit-link').forEach(link => {
+                    link.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        const sub = e.target.dataset.subreddit;
+                        subredditInput.value = sub;
+                        switchToView('browsing', { refresh: true });
+                    });
+                });
+
+            } catch (error) {
+                console.error("Failed to fetch multi-subreddit info:", error);
                 subredditInfoPanel.style.display = 'none';
             }
         }
@@ -599,10 +662,16 @@ window.addEventListener('load', () => {
                 minCommentsInput.value = '';
                 storyContainer.innerHTML = '';
 
-                if (!isMultiReddit && !query) {
-                    fetchSubredditInfo(subreddit);
-                } else {
+                const isSearch = query.length > 0;
+                if (isSearch) {
                     subredditInfoPanel.style.display = 'none';
+                } else {
+                    if (isMultiReddit) {
+                        const subreddits = subreddit.split('+').filter(Boolean);
+                        fetchMultiSubredditInfo(subreddits);
+                    } else {
+                        fetchSubredditInfo(subreddit);
+                    }
                 }
             }
             
