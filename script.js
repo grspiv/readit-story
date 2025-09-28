@@ -159,9 +159,25 @@ window.addEventListener('load', () => {
         flairFilterInput.addEventListener('input', () => renderFilteredStories());
         minScoreInput.addEventListener('input', () => renderFilteredStories());
         minCommentsInput.addEventListener('input', () => renderFilteredStories());
+        
         searchInput.addEventListener('input', () => {
             clearSearchButton.style.display = searchInput.value ? 'block' : 'none';
         });
+        
+        // Handle Enter key submission from input fields
+        subredditInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault(); // Prevent any default form submission behavior
+                fetchButton.click(); // Trigger the button click to run the search
+            }
+        });
+        searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                fetchButton.click();
+            }
+        });
+
         clearSearchButton.addEventListener('click', () => {
             searchInput.value = '';
             clearSearchButton.style.display = 'none';
@@ -235,7 +251,7 @@ window.addEventListener('load', () => {
                 if(markAllReadButton) markAllReadButton.style.display = 'flex';
                 
                 if (options && options.refresh) {
-                    // --- FIX: Robust multireddit input sanitation ---
+                    // Robust multireddit input sanitation
                     let subreddit = subredditInput.value.trim();
                     subreddit = subreddit.replace(/\s*\+\s*/g, '+'); // Consolidate space around +
                     subreddit = subreddit.replace(/\++/g, '+');       // Replace multiple ++ with a single +
@@ -397,7 +413,7 @@ window.addEventListener('load', () => {
         }
 
         function handleLoadMore() {
-            // --- FIX: Robust multireddit input sanitation ---
+            // Robust multireddit input sanitation
             let subreddit = subredditInput.value.trim();
             subreddit = subreddit.replace(/\s*\+\s*/g, '+'); // Consolidate space around +
             subreddit = subreddit.replace(/\++/g, '+');       // Replace multiple ++ with a single +
@@ -637,9 +653,6 @@ window.addEventListener('load', () => {
             }
         }
 
-        // ... The rest of the file is identical to the one provided in the "remove narration playlist and ambiance mode" response ...
-        // I will attach the full file without truncating it.
-        
         async function fetchAndShowComments(story) {
             closePopup(); // Close any existing popups and clear all caches.
 
@@ -831,6 +844,8 @@ window.addEventListener('load', () => {
             restoreReadingPosition(story.id); // Restore position after content is loaded
             findSeries(story);
         }
+
+        // ... This is the end of the changed section. The rest of the file follows. ...
 
         async function fetchCommentsForCurrentStory(sort) {
             const story = allFetchedPosts.find(p => p.id === currentStoryId) || getHistory().find(p => p.id === currentStoryId) || getSavedStories().find(p => p.id === currentStoryId);
@@ -2728,8 +2743,6 @@ window.addEventListener('load', () => {
             }
         }
         
-
-
         // --- Utility Functions ---
         function debounce(func, delay) {
             let timeout;

@@ -282,6 +282,11 @@ body.loaded {
     margin: 30px 0;
 }
 
+/* FIX: Center text content since JS sets display:flex on this button */
+#mark-all-read-button {
+    justify-content: center;
+}
+
 /* New styles for dedicated views */
 .dedicated-view {
     background-color: var(--card-bg);
