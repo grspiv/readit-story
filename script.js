@@ -235,7 +235,13 @@ window.addEventListener('load', () => {
                 if(markAllReadButton) markAllReadButton.style.display = 'flex';
                 
                 if (options && options.refresh) {
-                    const subreddit = subredditInput.value.trim().replace(/\s*\+\s*/g, '+');
+                    // --- FIX: Robust multireddit input sanitation ---
+                    let subreddit = subredditInput.value.trim();
+                    subreddit = subreddit.replace(/\s*\+\s*/g, '+'); // Consolidate space around +
+                    subreddit = subreddit.replace(/\++/g, '+');       // Replace multiple ++ with a single +
+                    subreddit = subreddit.replace(/^\+|\+$/g, '');   // Remove leading/trailing +
+                    subredditInput.value = subreddit; // Update input field with sanitized value
+                    
                     const sort = sortSelect.value;
                     const timeRange = timeRangeSelect.value;
                     currentSearchQuery = searchInput.value.trim();
@@ -391,7 +397,12 @@ window.addEventListener('load', () => {
         }
 
         function handleLoadMore() {
-            const subreddit = subredditInput.value.trim().replace(/\s*\+\s*/g, '+'); // Sanitize multi-reddit input
+            // --- FIX: Robust multireddit input sanitation ---
+            let subreddit = subredditInput.value.trim();
+            subreddit = subreddit.replace(/\s*\+\s*/g, '+'); // Consolidate space around +
+            subreddit = subreddit.replace(/\++/g, '+');       // Replace multiple ++ with a single +
+            subreddit = subreddit.replace(/^\+|\+$/g, '');   // Remove leading/trailing +
+            
             const sort = sortSelect.value;
             const timeRange = timeRangeSelect.value;
 
@@ -626,6 +637,9 @@ window.addEventListener('load', () => {
             }
         }
 
+        // ... The rest of the file is identical to the one provided in the "remove narration playlist and ambiance mode" response ...
+        // I will attach the full file without truncating it.
+        
         async function fetchAndShowComments(story) {
             closePopup(); // Close any existing popups and clear all caches.
 
