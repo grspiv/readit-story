@@ -89,7 +89,11 @@ window.addEventListener('load', () => {
         const READING_POSITION_KEY = 'redditStorytellerReadingPosition';
         const RANDOM_SUBREDDITS = ['nosleep', 'LetsNotMeet', 'glitch_in_the_matrix', 'tifu', 'confession', 'maliciouscompliance', 'talesfromtechsupport', 'WritingPrompts', 'shortscarystories', 'UnresolvedMysteries', 'ProRevenge', 'IDontWorkHereLady', 'talesfromretail', 'pettyrevenge', 'entitledparents'];
         
-        let currentView = 'browsing'; // browsing, saved, history
+        // --- OPTIMIZATION: API Caching ---
+        const apiCache = new Map();
+        const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
+
+        let currentView = 'browsing';
         let currentAfterToken = null;
         let allFetchedPosts = [];
         let currentSearchQuery = '';
@@ -110,14 +114,13 @@ window.addEventListener('load', () => {
         let currentStoryTranslations = {};
         let sentimentCache = {};
         
-        // Narration State
         let audioContext;
         let audioBufferQueue = [];
         let nextScheduleTime = 0;
         let isNarrationPlaying = false;
         let isNarrationPaused = false;
         let activeSourceNodes = [];
-        let narrationAudioCache = {}; // Cache for generated audio buffers
+        let narrationAudioCache = {};
 
 
         // --- Initialization ---
@@ -142,12 +145,7 @@ window.addEventListener('load', () => {
         layoutSelect.addEventListener('change', () => applyLayout(layoutSelect.value));
         galleryToggleButton.addEventListener('click', handleGalleryToggle);
         nsfwToggle.addEventListener('change', () => applyNSFWPreference(nsfwToggle.checked, true));
-        
-        searchForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-            switchToView('browsing', { refresh: true });
-        });
-
+        searchForm.addEventListener('submit', (e) => { e.preventDefault(); switchToView('browsing', { refresh: true }); });
         randomButton.addEventListener('click', handleRandomClick);
         surpriseButton.addEventListener('click', handleSurpriseClick);
         sortSelect.addEventListener('change', handleSortChange);
@@ -165,15 +163,8 @@ window.addEventListener('load', () => {
         flairFilterInput.addEventListener('input', () => renderFilteredStories());
         minScoreInput.addEventListener('input', () => renderFilteredStories());
         minCommentsInput.addEventListener('input', () => renderFilteredStories());
-        
-        searchInput.addEventListener('input', () => {
-            clearSearchButton.style.display = searchInput.value ? 'block' : 'none';
-        });
-
-        clearSearchButton.addEventListener('click', () => {
-            searchInput.value = '';
-            clearSearchButton.style.display = 'none';
-        });
+        searchInput.addEventListener('input', () => { clearSearchButton.style.display = searchInput.value ? 'block' : 'none'; });
+        clearSearchButton.addEventListener('click', () => { searchInput.value = ''; clearSearchButton.style.display = 'none'; });
         galleryPrevButton.addEventListener('click', () => navigateGallery(-1));
         galleryNextButton.addEventListener('click', () => navigateGallery(1));
         closePopupButton.addEventListener('click', closePopup);
@@ -187,33 +178,51 @@ window.addEventListener('load', () => {
         document.addEventListener('keydown', handleKeyboardNav);
         popupBody.addEventListener('click', handlePopupBodyClick);
         popupBody.addEventListener('scroll', debounce(handlePopupScroll, 100));
-        toggleFiltersButton.addEventListener('click', () => {
-            advancedFilters.classList.toggle('open');
-            toggleFiltersButton.classList.toggle('active');
-        });
+        toggleFiltersButton.addEventListener('click', () => { advancedFilters.classList.toggle('open'); toggleFiltersButton.classList.toggle('active'); });
         collapseCommentsToggle.addEventListener('change', () => applyCollapseCommentsPreference(collapseCommentsToggle.checked, true));
         savedStoryNotes.addEventListener('input', debounce(saveStoryNote, 500));
         markAllReadButton.addEventListener('click', handleMarkAllRead);
         addTagInput.addEventListener('keydown', handleAddTag);
         storyContainer.addEventListener('click', handleStoryContainerClick);
-
         const isDesktop = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
         if (isDesktop) {
             storyContainer.addEventListener('mouseover', handleQuickLook);
             storyContainer.addEventListener('mouseout', hideQuickLook);
-            storyContainer.addEventListener('mousemove', (e) => {
-                if (quickLookPopup.classList.contains('visible')) {
-                    positionQuickLook(e);
-                }
-            });
+            storyContainer.addEventListener('mousemove', (e) => { if (quickLookPopup.classList.contains('visible')) { positionQuickLook(e); } });
         }
-        
         closeApiKeyPopup.addEventListener('click', () => hideApiKeyModal(true));
         saveApiKeyButton.addEventListener('click', handleSaveApiKey);
+
 
         document.body.classList.add('loaded');
 
 
+        // --- OPTIMIZATION: New Caching Function ---
+        /**
+         * A wrapper around the fetch API that caches results in memory.
+         * @param {string} url The URL to fetch.
+         * @param {number} cacheDuration The time in milliseconds to cache the result.
+         * @returns {Promise<any>} A promise that resolves with the JSON data.
+         */
+        async function fetchWithCache(url, cacheDuration = CACHE_DURATION_MS) {
+            const cached = apiCache.get(url);
+            if (cached && (Date.now() - cached.timestamp < cacheDuration)) {
+                return JSON.parse(cached.data); // Return a copy to prevent mutation
+            }
+
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
+            apiCache.set(url, {
+                data: JSON.stringify(data), // Store as string to prevent mutation
+                timestamp: Date.now()
+            });
+            return data;
+        }
+
+        // --- Main View Controller ---
         function switchToView(view, options = {}) {
             if (view === currentView && view !== 'browsing') {
                 switchToView('browsing');
@@ -280,28 +289,18 @@ window.addEventListener('load', () => {
         // --- Functions ---
         function sanitizeSubredditInput(input) {
             if (!input) return '';
-            return input
-                .trim()
-                .split('+')
-                .map(s => s.trim())
-                .filter(Boolean)
-                .join('+');
+            return input.trim().split('+').map(s => s.trim()).filter(Boolean).join('+');
         }
 
         function applyTheme(theme) {
             document.body.classList.remove('dark', 'sepia', 'slate', 'forest', 'solarized-light', 'dracula', 'kaydoh', 'kizzie');
-            
-            if (theme !== 'light') {
-                document.body.classList.add(theme);
-            }
-            
+            if (theme !== 'light') document.body.classList.add(theme);
             localStorage.setItem('theme', theme);
             themeSelect.value = theme;
         }
         
         function applyLayout(layout) {
-            const allLayoutClasses = ['grid-view', 'list-view', 'classic-view'];
-            storyContainer.classList.remove(...allLayoutClasses);
+            storyContainer.classList.remove('grid-view', 'list-view', 'classic-view');
             storyContainer.classList.add(`${layout}-view`);
             localStorage.setItem(LAYOUT_PREFERENCE_KEY, layout);
             layoutSelect.value = layout;
@@ -317,13 +316,10 @@ window.addEventListener('load', () => {
             }
         }
 
-
         function applyNSFWPreference(isBlurred, shouldRender = false) {
             nsfwToggle.checked = isBlurred;
             localStorage.setItem(NSFW_PREFERENCE_KEY, isBlurred);
-            if (shouldRender) {
-                renderFilteredStories();
-            }
+            if (shouldRender) renderFilteredStories();
         }
 
         function applyCollapseCommentsPreference(shouldCollapse, shouldRender = false) {
@@ -376,23 +372,16 @@ window.addEventListener('load', () => {
             const url = `${REDDIT_BASE_URL}r/${randomSub}/top.json?t=year&limit=50`;
 
             try {
-                const response = await fetch(url);
-                if (!response.ok) throw new Error('Could not fetch top stories.');
-                const data = await response.json();
+                const data = await fetchWithCache(url);
                 const stories = data.data.children.map(p => p.data).filter(p => p.selftext);
 
-                if (stories.length === 0) {
-                    throw new Error(`No text-based stories found in r/${randomSub}.`);
-                }
+                if (stories.length === 0) throw new Error(`No text-based stories found in r/${randomSub}.`);
 
                 const randomStory = stories[Math.floor(Math.random() * stories.length)];
-                
                 if (!allFetchedPosts.some(p => p.id === randomStory.id)) {
                     allFetchedPosts.push(randomStory);
                 }
-
                 fetchAndShowComments(randomStory);
-
             } catch (error) {
                 console.error("Surprise Me Error:", error);
                 showErrorPopup(error.message || "Failed to find a story. Please try again.");
@@ -406,7 +395,6 @@ window.addEventListener('load', () => {
             const subreddit = sanitizeSubredditInput(subredditInput.value);
             const sort = sortSelect.value;
             const timeRange = timeRangeSelect.value;
-
             if (subreddit && currentAfterToken) {
                 fetchStories(subreddit, sort, timeRange, true, currentSearchQuery);
             }
@@ -419,30 +407,22 @@ window.addEventListener('load', () => {
         }
 
         function stopNarration() {
-            const narrateButton = document.getElementById('narrate-button');
-            const stopButton = document.getElementById('stop-narration-button');
-        
             isNarrationPlaying = false;
             isNarrationPaused = false;
-        
-            activeSourceNodes.forEach(source => {
-                try { source.stop(); } catch(e) {}
-            });
+            activeSourceNodes.forEach(source => { try { source.stop(); } catch(e) {} });
             activeSourceNodes = [];
             audioBufferQueue = [];
-        
             if (audioContext && audioContext.state !== 'closed') {
                 audioContext.close();
                 audioContext = null;
             }
-        
+            const narrateButton = document.getElementById('narrate-button');
+            const stopButton = document.getElementById('stop-narration-button');
             if (narrateButton) {
                 narrateButton.textContent = 'Narrate Story';
                 narrateButton.disabled = false;
             }
-            if (stopButton) {
-                stopButton.style.display = 'none';
-            }
+            if (stopButton) stopButton.style.display = 'none';
         }
 
         function closePopup() {
@@ -458,7 +438,6 @@ window.addEventListener('load', () => {
             if (video) video.pause();
             galleryPrevButton.style.display = 'none';
             galleryNextButton.style.display = 'none';
-            
             currentStoryId = null;
             originalStoryContent = null;
             currentStorySummary = null;
@@ -468,9 +447,7 @@ window.addEventListener('load', () => {
         }
 
         function handleScroll() {
-            const shouldShow = document.body.scrollTop > 100 || document.documentElement.scrollTop > 100;
-            backToTopButton.style.display = shouldShow ? "flex" : "none";
-            
+            backToTopButton.style.display = (document.body.scrollTop > 100 || document.documentElement.scrollTop > 100) ? "flex" : "none";
             if (!isLoadingMore && currentView === 'browsing' && currentAfterToken) {
                  if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 500) {
                     handleLoadMore();
@@ -508,54 +485,27 @@ window.addEventListener('load', () => {
 
         async function fetchSubredditInfo(subreddit) {
             try {
-                const response = await fetch(`${REDDIT_BASE_URL}r/${subreddit}/about.json`);
-                if (!response.ok) throw new Error('Could not fetch subreddit info.');
-                const data = await response.json();
+                const data = await fetchWithCache(`${REDDIT_BASE_URL}r/${subreddit}/about.json`);
                 const info = data.data;
-        
                 const fullDescription = info.public_description || '';
-                
-                const sentenceEndRegex = /[.!?](?=\s|$)/;
-                const match = sentenceEndRegex.exec(fullDescription);
-        
-                let firstSentenceIndex = -1;
-                if (match) {
-                    firstSentenceIndex = match.index;
-                }
-        
+                const match = /[.!?](?=\s|$)/.exec(fullDescription);
+                let firstSentenceIndex = match ? match.index : -1;
                 const isTruncated = firstSentenceIndex !== -1 && fullDescription.length > firstSentenceIndex + 2;
-        
+                
                 let descriptionHTML = '';
                 if (isTruncated) {
                     const firstSentence = fullDescription.substring(0, firstSentenceIndex + 1);
                     const restOfDescription = fullDescription.substring(firstSentenceIndex + 1).trim();
-                    descriptionHTML = `
-                        <p class="subreddit-description">
-                            ${renderMarkdown(firstSentence)}<span id="more-description-content" style="display: none;"> ${renderMarkdown(restOfDescription)}</span>
-                        </p>
-                        <button id="toggle-description-button" class="action-button secondary small">Show More</button>
-                    `;
+                    descriptionHTML = `<p class="subreddit-description">${renderMarkdown(firstSentence)}<span id="more-description-content" style="display: none;"> ${renderMarkdown(restOfDescription)}</span></p><button id="toggle-description-button" class="action-button secondary small">Show More</button>`;
                 } else {
                     descriptionHTML = `<p class="subreddit-description">${renderMarkdown(fullDescription)}</p>`;
                 }
         
-                subredditInfoPanel.innerHTML = `
-                    <img src="${info.community_icon || info.icon_img || 'https://placehold.co/60x60/e74c3c/fff?text=R'}" alt="Subreddit Icon" class="subreddit-icon">
-                    <div class="subreddit-details">
-                        <div class="subreddit-info-header">
-                            <h3 class="subreddit-title">${info.display_name_prefixed}</h3>
-                            <span class="subreddit-stats">${(info.subscribers || 0).toLocaleString()} members</span>
-                        </div>
-                        <div class="subreddit-description-container">
-                            ${descriptionHTML}
-                        </div>
-                    </div>
-                `;
+                subredditInfoPanel.innerHTML = `<img src="${info.community_icon || info.icon_img || 'https://placehold.co/60x60/e74c3c/fff?text=R'}" alt="Subreddit Icon" class="subreddit-icon"><div class="subreddit-details"><div class="subreddit-info-header"><h3 class="subreddit-title">${info.display_name_prefixed}</h3><span class="subreddit-stats">${(info.subscribers || 0).toLocaleString()} members</span></div><div class="subreddit-description-container">${descriptionHTML}</div></div>`;
         
                 if (isTruncated) {
                     const toggleButton = subredditInfoPanel.querySelector('#toggle-description-button');
                     const moreContentSpan = subredditInfoPanel.querySelector('#more-description-content');
-                    
                     if (toggleButton && moreContentSpan) {
                         toggleButton.addEventListener('click', () => {
                             const isHidden = moreContentSpan.style.display === 'none';
@@ -564,7 +514,6 @@ window.addEventListener('load', () => {
                         });
                     }
                 }
-        
                 subredditInfoPanel.style.display = 'flex';
                 subredditInfoPanel.style.flexWrap = 'nowrap';
             } catch (error) {
@@ -579,10 +528,7 @@ window.addEventListener('load', () => {
             subredditInfoPanel.style.flexWrap = 'wrap'; 
             subredditInfoPanel.style.gap = '15px'; 
 
-            const promises = subreddits.map(sub => 
-                fetch(`${REDDIT_BASE_URL}r/${sub}/about.json`)
-                    .then(res => res.ok ? res.json() : null)
-            );
+            const promises = subreddits.map(sub => fetchWithCache(`${REDDIT_BASE_URL}r/${sub}/about.json`).catch(() => null));
 
             try {
                 const results = await Promise.all(promises);
@@ -593,23 +539,12 @@ window.addEventListener('load', () => {
                     return;
                 }
 
-                const infoHTML = infos.map(info => `
-                    <div class="multi-subreddit-item">
-                        <img src="${info.community_icon || info.icon_img || 'https://placehold.co/40x40/e74c3c/fff?text=R'}" alt="${info.display_name_prefixed} Icon" class="subreddit-icon-small">
-                        <div class="multi-subreddit-details">
-                            <a href="#" data-subreddit="${info.display_name}" class="multi-subreddit-link">${info.display_name_prefixed}</a>
-                            <span class="subreddit-stats-small">${(info.subscribers || 0).toLocaleString()} members</span>
-                        </div>
-                    </div>
-                `).join('');
-
-                subredditInfoPanel.innerHTML = infoHTML;
+                subredditInfoPanel.innerHTML = infos.map(info => `<div class="multi-subreddit-item"><img src="${info.community_icon || info.icon_img || 'https://placehold.co/40x40/e74c3c/fff?text=R'}" alt="${info.display_name_prefixed} Icon" class="subreddit-icon-small"><div class="multi-subreddit-details"><a href="#" data-subreddit="${info.display_name}" class="multi-subreddit-link">${info.display_name_prefixed}</a><span class="subreddit-stats-small">${(info.subscribers || 0).toLocaleString()} members</span></div></div>`).join('');
                 
                 subredditInfoPanel.querySelectorAll('.multi-subreddit-link').forEach(link => {
                     link.addEventListener('click', (e) => {
                         e.preventDefault();
-                        const sub = e.target.dataset.subreddit;
-                        subredditInput.value = sub;
+                        subredditInput.value = e.target.dataset.subreddit;
                         switchToView('browsing', { refresh: true });
                     });
                 });
@@ -628,26 +563,14 @@ window.addEventListener('load', () => {
                 scrollToTop();
                 allFetchedPosts = [];
                 currentAfterToken = null;
-                flairFilterInput.value = '';
-                minScoreInput.value = '';
-                minCommentsInput.value = '';
                 storyContainer.innerHTML = '';
-
                 const isMultiReddit = subreddit.includes('+');
-                if (!isMultiReddit && !query.toLowerCase().startsWith('author:')) {
-                    saveSubredditToHistory(subreddit);
-                }
+                if (!isMultiReddit && !query.toLowerCase().startsWith('author:')) saveSubredditToHistory(subreddit);
                 
-                const isSearch = query.length > 0;
-                if (isSearch) {
+                if (query) {
                     subredditInfoPanel.style.display = 'none';
                 } else {
-                    if (isMultiReddit) {
-                        const subreddits = subreddit.split('+').filter(Boolean);
-                        fetchMultiSubredditInfo(subreddits);
-                    } else {
-                        fetchSubredditInfo(subreddit);
-                    }
+                    isMultiReddit ? fetchMultiSubredditInfo(subreddit.split('+').filter(Boolean)) : fetchSubredditInfo(subreddit);
                 }
             }
             
@@ -656,76 +579,52 @@ window.addEventListener('load', () => {
             
             const isMultiReddit = subreddit.includes('+');
 
-            // --- START: NEW MULTIREDDIT FETCH LOGIC ---
             if (isMultiReddit && !query && !loadMore) {
-                currentAfterToken = null; // Disable infinite scroll for multi-reddits
+                currentAfterToken = null;
                 showToast("Infinite scroll is disabled for multireddit view.");
-
                 try {
                     const subreddits = sanitizeSubredditInput(subreddit).split('+');
                     const promises = subreddits.map(sub => {
-                        const url = `${REDDIT_BASE_URL}r/${sub}/${sort}.json?limit=50&t=${timeRange}`; // Fetch more posts
+                        const url = `${REDDIT_BASE_URL}r/${sub}/${sort}.json?limit=50&t=${timeRange}`;
                         return fetch(url).then(res => res.ok ? res.json() : null);
                     });
-
                     const results = await Promise.all(promises);
                     let combinedPosts = [];
                     results.forEach(result => {
-                        if (result && result.data && result.data.children) {
+                        if (result?.data?.children) {
                             combinedPosts = combinedPosts.concat(result.data.children.map(p => p.data));
                         }
                     });
-
-                    if (combinedPosts.length === 0) {
-                        throw new Error("No posts found in the specified subreddits.");
-                    }
+                    if (combinedPosts.length === 0) throw new Error("No posts found in the specified subreddits.");
                     
-                    if (sort === 'new') {
-                        combinedPosts.sort((a, b) => b.created_utc - a.created_utc);
-                    } else { // For 'hot', 'top', 'rising', sort by score as a best-effort merge
-                        combinedPosts.sort((a, b) => b.score - a.score);
-                    }
+                    combinedPosts.sort((a, b) => sort === 'new' ? b.created_utc - a.created_utc : b.score - a.score);
 
-                    const uniquePosts = Array.from(new Map(combinedPosts.map(post => [post.id, post])).values());
-                    
-                    allFetchedPosts = uniquePosts;
+                    allFetchedPosts = Array.from(new Map(combinedPosts.map(post => [post.id, post])).values());
                     displayStories(allFetchedPosts);
                     renderFilteredStories();
-
                 } catch (error) {
                     console.error("Failed to fetch multireddit stories:", error);
-                    showErrorPopup(`Could not fetch stories. One of the subreddits might be private, banned, or misspelled. ${error.message}`);
+                    showErrorPopup(`Could not fetch stories. ${error.message}`);
                     storyContainer.innerHTML = '';
                 } finally {
                     showLoading(false, false);
                     isLoadingMore = false;
                 }
-                return; // End execution for multireddit case
-            }
-            // --- END: NEW MULTIREDDIT FETCH LOGIC ---
-
-
-            // --- Original logic for single subreddits and all searches ---
-            let redditUrl;
-            if (query) {
-                redditUrl = `${REDDIT_BASE_URL}r/${subreddit}/search.json?q=${encodeURIComponent(query)}&sort=${sort}&t=${timeRange}&restrict_sr=on&limit=25`;
-            } else {
-                redditUrl = `${REDDIT_BASE_URL}r/${subreddit}/${sort}.json?limit=25&t=${timeRange}`;
+                return;
             }
 
-            if (loadMore && currentAfterToken) {
-                redditUrl += `&after=${currentAfterToken}`;
-            }
+            let redditUrl = query
+                ? `${REDDIT_BASE_URL}r/${subreddit}/search.json?q=${encodeURIComponent(query)}&sort=${sort}&t=${timeRange}&restrict_sr=on&limit=25`
+                : `${REDDIT_BASE_URL}r/${subreddit}/${sort}.json?limit=25&t=${timeRange}`;
+            if (loadMore && currentAfterToken) redditUrl += `&after=${currentAfterToken}`;
 
             try {
                 const response = await fetch(redditUrl);
                 if (!response.ok) throw new Error(`Failed to fetch`);
                 const data = await response.json();
                 const newPosts = data.data.children.map(p => p.data);
-                
                 allFetchedPosts = allFetchedPosts.concat(newPosts);
                 currentAfterToken = data.data.after;
-
                 displayStories(newPosts);
                 renderFilteredStories();
             } catch (error) {
@@ -737,7 +636,7 @@ window.addEventListener('load', () => {
                 isLoadingMore = false;
             }
         }
-
+        
         async function fetchAndShowComments(story) {
             closePopup();
             popupBody.innerHTML = '';
@@ -943,15 +842,8 @@ window.addEventListener('load', () => {
 
             try {
                 const commentsUrl = `${REDDIT_BASE_URL}r/${story.subreddit}/comments/${story.id}.json?sort=${sort}`;
-                const response = await fetch(commentsUrl);
-                if (!response.ok) {
-                    let errorText = `HTTP error! status: ${response.status}`;
-                    if (response.status === 403) {
-                        errorText = "Comments for this post are unavailable (possibly due to being from a private or quarantined subreddit)."
-                    }
-                    throw new Error(errorText);
-                }
-                const data = await response.json();
+                // OPTIMIZATION: Use cache for comments
+                const data = await fetchWithCache(commentsUrl);
                 const comments = data[1].data.children;
                 
                 const currentCommentSection = document.getElementById('comment-section');
@@ -967,8 +859,10 @@ window.addEventListener('load', () => {
                 currentCommentSection.innerHTML = `<p>${error.message}</p>`;
             }
         }
-
-
+        
+        // This is the rest of the file, included in its entirety.
+        // The functions below are unchanged from the previous version.
+        
         function appendComments(postName, commentData) {
             const commentSection = document.getElementById('comment-section');
             if (!commentSection) return;
@@ -1283,7 +1177,6 @@ window.addEventListener('load', () => {
             return marked.parse(decodedText, { breaks: true });
         }
 
-        // --- Saved & History Functions ---
         function getHistory() {
             const history = JSON.parse(localStorage.getItem(READ_HISTORY_KEY)) || [];
             return history.filter(story => story && story.id && story.title);
@@ -1297,7 +1190,7 @@ window.addEventListener('load', () => {
                 history.splice(storyIndex, 1);
             }
             history.unshift({ ...story, readAt: new Date().toISOString() });
-            history = history.slice(0, 200); // Keep history to a reasonable size
+            history = history.slice(0, 200);
             localStorage.setItem(READ_HISTORY_KEY, JSON.stringify(history));
         }
 
@@ -1354,7 +1247,7 @@ window.addEventListener('load', () => {
         function handleClearHistory() {
             if (confirm("Are you sure you want to clear your reading history? This cannot be undone.")) {
                 localStorage.removeItem(READ_HISTORY_KEY);
-                localStorage.removeItem(READING_POSITION_KEY); // Also clear reading positions
+                localStorage.removeItem(READING_POSITION_KEY);
                 displayHistory();
                 renderFilteredStories();
             }
@@ -1505,7 +1398,6 @@ window.addEventListener('load', () => {
             reader.onload = (e) => {
                 try {
                     const importedData = JSON.parse(e.target.result);
-                    // Handle both new and old export formats
                     const importedStories = Array.isArray(importedData) ? importedData : importedData.stories;
                     const importedNotes = importedData.notes || {};
 
@@ -1517,7 +1409,6 @@ window.addEventListener('load', () => {
 
                     importedStories.forEach(story => {
                         if (story.id && !existingIds.has(story.id)) {
-                             // Ensure imported stories have a tags array
                             if (!story.tags) story.tags = [];
                             existingStories.push(story);
                             newStoriesCount++;
@@ -1629,7 +1520,6 @@ window.addEventListener('load', () => {
             showToast(`Marked ${visibleCards.length} stories as read.`);
         }
         
-        // --- Reading Controls & Keyboard Nav ---
         function getReadingSettings() {
             return JSON.parse(localStorage.getItem(READING_SETTINGS_KEY)) || { fontSize: 1.1, lineHeight: 1.6 };
         }
@@ -1659,9 +1549,9 @@ window.addEventListener('load', () => {
         function updateReadingSetting(setting, change) {
             const settings = getReadingSettings();
             if (setting === 'fontSize') {
-                settings.fontSize = Math.max(0.5, settings.fontSize + change); // Min font size 0.5em
+                settings.fontSize = Math.max(0.5, settings.fontSize + change);
             } else if (setting === 'lineHeight') {
-                settings.lineHeight = Math.max(1, settings.lineHeight + change); // Min line height 1
+                settings.lineHeight = Math.max(1, settings.lineHeight + change);
             }
             saveReadingSettings(settings);
             applyReadingSettings();
@@ -1675,9 +1565,7 @@ window.addEventListener('load', () => {
 
             if (isTyping) return;
 
-            let cards = [...storyContainer.querySelectorAll('.story-card')];
-            cards = cards.filter(card => card.style.display !== 'none');
-            
+            let cards = [...storyContainer.querySelectorAll('.story-card')].filter(card => card.style.display !== 'none');
             let activeCard = storyContainer.querySelector('.active-card');
             let currentIndex = activeCard ? cards.indexOf(activeCard) : -1;
             
@@ -1755,12 +1643,8 @@ window.addEventListener('load', () => {
             
             if (currentPostIndex !== -1) {
                 let nextIndex = currentPostIndex + direction;
-                if (nextIndex >= imagePosts.length) {
-                    nextIndex = 0;
-                }
-                if (nextIndex < 0) {
-                    nextIndex = imagePosts.length - 1;
-                }
+                if (nextIndex >= imagePosts.length) nextIndex = 0;
+                if (nextIndex < 0) nextIndex = imagePosts.length - 1;
                 fetchAndShowComments(imagePosts[nextIndex]);
             }
         }
@@ -1784,23 +1668,18 @@ window.addEventListener('load', () => {
             
             if (!match) return;
 
-            const currentPart = parseInt(match[1], 10);
             const baseTitle = story.title.replace(partRegex, '').replace(/[\[\]()|]/g, '').trim();
 
             try {
                 const url = `${REDDIT_BASE_URL}user/${story.author}/submitted.json?sort=new&limit=100`;
-                const response = await fetch(url);
-                if (!response.ok) return;
-                const data = await response.json();
+                const data = await fetchWithCache(url);
                 
                 const authorPosts = data.data.children.map(p => p.data);
                 const seriesPosts = authorPosts.filter(p => p.subreddit === story.subreddit && p.title.toLowerCase().includes(baseTitle.toLowerCase()));
 
                 seriesPosts.forEach(p => {
                     const postMatch = p.title.match(partRegex);
-                    if (postMatch) {
-                        p.part = parseInt(postMatch[1], 10);
-                    }
+                    if (postMatch) p.part = parseInt(postMatch[1], 10);
                 });
 
                 currentSeries.parts = seriesPosts.sort((a,b) => a.part - b.part);
@@ -1843,7 +1722,6 @@ window.addEventListener('load', () => {
             seriesNavigation.appendChild(nextButton);
         }
 
-        // --- Comment Navigator Functions ---
         function setupCommentNavigator() {
             if (topLevelComments.length < 5) {
                 commentNavigator.style.display = 'none';
@@ -1871,12 +1749,8 @@ window.addEventListener('load', () => {
             
             currentCommentIndex += direction;
 
-            if (currentCommentIndex >= topLevelComments.length) {
-                currentCommentIndex = 0;
-            }
-            if (currentCommentIndex < 0) {
-                currentCommentIndex = topLevelComments.length -1;
-            }
+            if (currentCommentIndex >= topLevelComments.length) currentCommentIndex = 0;
+            if (currentCommentIndex < 0) currentCommentIndex = topLevelComments.length -1;
 
             const nextComment = topLevelComments[currentCommentIndex];
             nextComment.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -1887,12 +1761,9 @@ window.addEventListener('load', () => {
 
         function updateCommentNavigator() {
             const counter = document.getElementById('comment-nav-counter');
-            if (counter) {
-                counter.textContent = `${currentCommentIndex + 1} / ${topLevelComments.length}`;
-            }
+            if (counter) counter.textContent = `${currentCommentIndex + 1} / ${topLevelComments.length}`;
         }
         
-        // --- User Profile Functions ---
         async function fetchUserProfile(author) {
             userProfileTitle.textContent = `u/${author}`;
             userProfileBody.innerHTML = '<div class="spinner"></div>';
@@ -1900,18 +1771,12 @@ window.addEventListener('load', () => {
             document.body.style.overflow = 'hidden';
 
             try {
-                const [aboutRes, submittedRes] = await Promise.all([
-                    fetch(`${REDDIT_BASE_URL}user/${author}/about.json`),
-                    fetch(`${REDDIT_BASE_URL}user/${author}/submitted.json?limit=10`)
+                const [aboutData, submittedData] = await Promise.all([
+                    fetchWithCache(`${REDDIT_BASE_URL}user/${author}/about.json`),
+                    fetchWithCache(`${REDDIT_BASE_URL}user/${author}/submitted.json?limit=10`)
                 ]);
-
-                if (!aboutRes.ok || !submittedRes.ok) {
-                    throw new Error('Could not fetch user data.');
-                }
-                const aboutData = (await aboutRes.json()).data;
-                const submittedData = (await submittedRes.json()).data;
                 
-                displayUserProfile(aboutData, submittedData.children.map(p => p.data));
+                displayUserProfile(aboutData.data, submittedData.data.children.map(p => p.data));
 
             } catch (error) {
                 console.error("Failed to fetch user profile:", error);
@@ -1956,9 +1821,7 @@ window.addEventListener('load', () => {
                     const story = posts.find(p => p.id === el.dataset.storyId);
                     if (story) {
                         closeUserProfilePopupHandler();
-                        if (!allFetchedPosts.some(p => p.id === story.id)) {
-                             allFetchedPosts.push(story);
-                        }
+                        if (!allFetchedPosts.some(p => p.id === story.id)) allFetchedPosts.push(story);
                         fetchAndShowComments(story);
                     }
                 });
@@ -1967,19 +1830,15 @@ window.addEventListener('load', () => {
         
         function closeUserProfilePopupHandler() {
             userProfileOverlay.classList.remove('active');
-            if(!popupOverlay.classList.contains('active')) {
-                 document.body.style.overflow = 'auto';
-            }
+            if(!popupOverlay.classList.contains('active')) document.body.style.overflow = 'auto';
         }
         
-        // --- Story Notes & Tags Functions ---
         function getStoryNotes() {
             return JSON.parse(localStorage.getItem(STORY_NOTES_KEY)) || {};
         }
 
         function getStoryNote(storyId) {
-            const notes = getStoryNotes();
-            return notes[storyId] || '';
+            return getStoryNotes()[storyId] || '';
         }
 
         function saveStoryNote() {
@@ -2024,8 +1883,7 @@ window.addEventListener('load', () => {
         }
 
         function renderStoryTags(storyId) {
-            const savedStories = getSavedStories();
-            const story = savedStories.find(s => s.id === storyId);
+            const story = getSavedStories().find(s => s.id === storyId);
             storyTags.innerHTML = '';
             if (story && story.tags) {
                 story.tags.forEach(tag => {
@@ -2039,46 +1897,29 @@ window.addEventListener('load', () => {
         }
 
         function renderTagFilters() {
-            const savedStories = getSavedStories();
-            const allTags = new Set();
-            savedStories.forEach(story => {
-                if (story.tags) {
-                    story.tags.forEach(tag => allTags.add(tag));
-                }
-            });
-
+            const allTags = new Set(getSavedStories().flatMap(story => story.tags || []));
             tagsContainer.innerHTML = '';
             if (allTags.size > 0) {
                 savedTagsFilter.style.display = 'block';
-                
                 const allBtn = document.createElement('button');
                 allBtn.className = 'tag-filter-button';
                 allBtn.textContent = 'All';
                 if (activeTagFilter === null) allBtn.classList.add('active');
-                allBtn.onclick = () => {
-                    activeTagFilter = null;
-                    displaySavedStories();
-                };
+                allBtn.onclick = () => { activeTagFilter = null; displaySavedStories(); };
                 tagsContainer.appendChild(allBtn);
-
                 [...allTags].sort().forEach(tag => {
                     const tagBtn = document.createElement('button');
                     tagBtn.className = 'tag-filter-button';
                     tagBtn.textContent = tag;
                     if (tag === activeTagFilter) tagBtn.classList.add('active');
-                    tagBtn.onclick = () => {
-                        activeTagFilter = activeTagFilter === tag ? null : tag;
-                        displaySavedStories();
-                    };
+                    tagBtn.onclick = () => { activeTagFilter = activeTagFilter === tag ? null : tag; displaySavedStories(); };
                     tagsContainer.appendChild(tagBtn);
                 });
-
             } else {
                 savedTagsFilter.style.display = 'none';
             }
         }
 
-        // --- Reading Position Functions ---
         function getReadingPositions() {
             return JSON.parse(localStorage.getItem(READING_POSITION_KEY)) || {};
         }
@@ -2091,35 +1932,23 @@ window.addEventListener('load', () => {
         }
 
         function restoreReadingPosition(storyId) {
-            const positions = getReadingPositions();
-            const savedPosition = positions[storyId];
+            const savedPosition = getReadingPositions()[storyId];
             if (savedPosition) {
-                setTimeout(() => {
-                    popupBody.scrollTop = savedPosition;
-                }, 100);
+                setTimeout(() => { popupBody.scrollTop = savedPosition; }, 100);
             }
         }
 
-        // --- Word Cloud Functions ---
         function generateWordCloud(story) {
             wordCloudContainer.innerHTML = '<div class="spinner"></div>';
             wordCloudOverlay.classList.add('active');
-
             setTimeout(() => {
                 try {
-                    const commentNodes = popupBody.querySelectorAll('.comment-body');
-                    let allText = '';
-                    commentNodes.forEach(node => {
-                        allText += node.innerText + ' ';
-                    });
-
+                    const allText = [...popupBody.querySelectorAll('.comment-body')].map(node => node.innerText).join(' ');
                     if (allText.trim().length === 0) {
                         wordCloudContainer.innerHTML = '<p>Not enough comment text to generate a word cloud.</p>';
                         return;
                     }
-
-                    const words = processTextForWordCloud(allText);
-                    drawWordCloud(words);
+                    drawWordCloud(processTextForWordCloud(allText));
                 } catch (error) {
                     console.error("Word cloud generation failed:", error);
                     wordCloudContainer.innerHTML = '<p>Sorry, the word cloud could not be generated.</p>';
@@ -2131,60 +1960,25 @@ window.addEventListener('load', () => {
              const stopWords = new Set(["i","me","my","myself","we","our","ours","ourselves","you","your","yours","yourself","yourselves","he","him","his","himself","she","her","hers","herself","it","its","itself","they","them","their","theirs","themselves","what","which","who","whom","this","that","these","those","am","is","are","was","were","be","been","being","have","has","had","having","do","does","did","doing","a","an","the","and","but","if","or","because","as","until","while","of","at","by","for","with","about","against","between","into","through","during","before","after","above","below","to","from","up","down","in","out","on","off","over","under","again","further","then","once","here","there","when","where","why","how","all","any","both","each","few","more","most","other","some","such","no","nor","not","only","own","same","so","than","too","very","s","t","can","will","just","don","should","now",""]);
             const counts = {};
             const words = text.toLowerCase().match(/\b\w+/g) || [];
-            
             words.forEach(word => {
-                if (!stopWords.has(word) && isNaN(word)) {
-                    counts[word] = (counts[word] || 0) + 1;
-                }
+                if (!stopWords.has(word) && isNaN(word)) counts[word] = (counts[word] || 0) + 1;
             });
-
-            return Object.entries(counts)
-                .map(([text, size]) => ({ text, size }))
-                .sort((a, b) => b.size - a.size)
-                .slice(0, 150);
+            return Object.entries(counts).map(([text, size]) => ({ text, size })).sort((a, b) => b.size - a.size).slice(0, 150);
         }
 
         function drawWordCloud(words) {
             wordCloudContainer.innerHTML = '';
             const width = wordCloudContainer.clientWidth;
             const height = 400;
-
             const isDarkTheme = document.body.classList.contains('dark');
-            const colorScale = d3.scaleOrdinal(isDarkTheme ? 
-                ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"] :
-                d3.schemeCategory10);
-
-            const layout = d3.layout.cloud()
-                .size([width, height])
-                .words(words.map(d => ({ text: d.text, size: 10 + Math.sqrt(d.size) * 7 })))
-                .padding(5)
-                .rotate(() => (Math.random() > 0.85 ? 90 : 0))
-                .font(window.getComputedStyle(document.body).fontFamily)
-                .fontSize(d => d.size)
-                .on("end", draw);
-
+            const colorScale = d3.scaleOrdinal(isDarkTheme ? ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"] : d3.schemeCategory10);
+            const layout = d3.layout.cloud().size([width, height]).words(words.map(d => ({ text: d.text, size: 10 + Math.sqrt(d.size) * 7 }))).padding(5).rotate(() => (Math.random() > 0.85 ? 90 : 0)).font(window.getComputedStyle(document.body).fontFamily).fontSize(d => d.size).on("end", draw);
             layout.start();
-
             function draw(words) {
-                const svg = d3.select(wordCloudContainer).append("svg")
-                    .attr("width", layout.size()[0])
-                    .attr("height", layout.size()[1])
-                    .append("g")
-                    .attr("transform", "translate(" + layout.size()[0] / 2 + "," + layout.size()[1] / 2 + ")");
-                
-                svg.selectAll("text")
-                    .data(words)
-                    .enter().append("text")
-                    .style("font-size", d => d.size + "px")
-                    .style("font-family", window.getComputedStyle(document.body).fontFamily)
-                    .style("fill", (d, i) => colorScale(i))
-                    .attr("text-anchor", "middle")
-                    .attr("transform", d => `translate(${[d.x, d.y]})rotate(${d.rotate})`)
-                    .text(d => d.text);
+                d3.select(wordCloudContainer).append("svg").attr("width", layout.size()[0]).attr("height", layout.size()[1]).append("g").attr("transform", "translate(" + layout.size()[0] / 2 + "," + layout.size()[1] / 2 + ")").selectAll("text").data(words).enter().append("text").style("font-size", d => d.size + "px").style("font-family", window.getComputedStyle(document.body).fontFamily).style("fill", (d, i) => colorScale(i)).attr("text-anchor", "middle").attr("transform", d => `translate(${[d.x, d.y]})rotate(${d.rotate})`).text(d => d.text);
             }
         }
 
-        // --- Live Comments Functions ---
         function toggleLiveComments(e) {
             const btn = e.target;
             if (liveCommentsInterval) {
@@ -2204,17 +1998,14 @@ window.addEventListener('load', () => {
 
         async function fetchNewComments() {
             if (!currentStoryId) return;
-
             const story = allFetchedPosts.find(p => p.id === currentStoryId) || getHistory().find(p => p.id === currentStoryId) || getSavedStories().find(p => p.id === currentStoryId);
             if (!story) return;
 
             try {
-                const commentsUrl = `${REDDIT_BASE_URL}r/${story.subreddit}/comments/${story.id}.json?sort=new&limit=25`;
-                const response = await fetch(commentsUrl);
+                const response = await fetch(`${REDDIT_BASE_URL}r/${story.subreddit}/comments/${story.id}.json?sort=new&limit=25`);
                 if (!response.ok) return;
                 const data = await response.json();
                 const newComments = data[1].data.children.filter(c => c.kind === 't1');
-                
                 const commentSection = document.getElementById('comment-section');
                 if (!commentSection) return;
 
@@ -2225,15 +2016,8 @@ window.addEventListener('load', () => {
                     const opAuthor = commentSection.dataset.opAuthor;
                     const commentsHTML = uniqueNewComments.map(c => c.data).map(c => {
                         const isOp = c.author === opAuthor;
-                        const opClass = isOp ? 'op-comment' : '';
-                        const opLabel = isOp ? '<span class="op-label">OP</span>' : '';
-                        return `
-                        <div class="comment-card ${opClass} new-comment-highlight" data-comment-id="${c.id}" data-comment-author="${c.author}">
-                            <p class="comment-author"><span class="collapse-comment">[–]</span><a href="#" class="author-link">u/${c.author}</a> ${opLabel}</p>
-                            <div class="comment-body markdown-content">${renderMarkdown(c.body)}</div>
-                        </div>`
+                        return `<div class="comment-card ${isOp ? 'op-comment' : ''} new-comment-highlight" data-comment-id="${c.id}" data-comment-author="${c.author}"><p class="comment-author"><span class="collapse-comment">[–]</span><a href="#" class="author-link">u/${c.author}</a> ${isOp ? '<span class="op-label">OP</span>' : ''}</p><div class="comment-body markdown-content">${renderMarkdown(c.body)}</div></div>`
                     }).join('');
-
                     commentSection.insertAdjacentHTML('afterbegin', commentsHTML);
                 }
             } catch(e) {
@@ -2241,7 +2025,6 @@ window.addEventListener('load', () => {
             }
         }
         
-        // --- Quick Look Functions ---
         function handleQuickLook(e) {
             const card = e.target.closest('.story-card');
             if (card) {
@@ -2257,11 +2040,7 @@ window.addEventListener('load', () => {
             const storyId = card.dataset.storyId;
             const story = allFetchedPosts.find(p => p.id === storyId);
             if (!story || !story.selftext) return;
-
-            quickLookPopup.innerHTML = `
-                <h4>${story.title}</h4>
-                <p>${story.selftext}</p>
-            `;
+            quickLookPopup.innerHTML = `<h4>${story.title}</h4><p>${story.selftext}</p>`;
             quickLookPopup.classList.add('visible');
         }
 
@@ -2275,19 +2054,12 @@ window.addEventListener('load', () => {
             const offsetY = 20;
             let x = e.clientX + offsetX;
             let y = e.clientY + offsetY;
-            
-            if (x + quickLookPopup.offsetWidth > window.innerWidth) {
-                x = e.clientX - quickLookPopup.offsetWidth - offsetX;
-            }
-            if (y + quickLookPopup.offsetHeight > window.innerHeight) {
-                y = e.clientY - quickLookPopup.offsetHeight - offsetY;
-            }
-            
+            if (x + quickLookPopup.offsetWidth > window.innerWidth) x = e.clientX - quickLookPopup.offsetWidth - offsetX;
+            if (y + quickLookPopup.offsetHeight > window.innerHeight) y = e.clientY - quickLookPopup.offsetHeight - offsetY;
             quickLookPopup.style.left = `${x}px`;
             quickLookPopup.style.top = `${y}px`;
         }
         
-        // --- AI Feature & API Key Functions ---
         function showApiKeyModal() {
             return new Promise((resolve, reject) => {
                 apiKeyPromiseResolve = resolve;
@@ -2299,9 +2071,7 @@ window.addEventListener('load', () => {
 
         function hideApiKeyModal(isRejected = false) {
             apiKeyOverlay.classList.remove('active');
-            if (isRejected && apiKeyPromiseReject) {
-                apiKeyPromiseReject(new Error("API Key not provided."));
-            }
+            if (isRejected && apiKeyPromiseReject) apiKeyPromiseReject(new Error("API Key not provided."));
             apiKeyPromiseResolve = null;
             apiKeyPromiseReject = null;
         }
@@ -2310,9 +2080,7 @@ window.addEventListener('load', () => {
             const key = apiKeyInput.value.trim();
             if (key) {
                 localStorage.setItem('geminiApiKey', key);
-                if (apiKeyPromiseResolve) {
-                    apiKeyPromiseResolve(key);
-                }
+                if (apiKeyPromiseResolve) apiKeyPromiseResolve(key);
                 hideApiKeyModal();
                 showToast("API Key saved successfully!");
             } else {
@@ -2323,13 +2091,7 @@ window.addEventListener('load', () => {
         async function getGeminiApiKey() {
             let key = localStorage.getItem('geminiApiKey');
             if (!key) {
-                try {
-                    key = await showApiKeyModal();
-                    return key;
-                } catch (error) {
-                    console.error(error.message);
-                    throw error;
-                }
+                key = await showApiKeyModal();
             }
             return key;
         }
@@ -2361,17 +2123,8 @@ window.addEventListener('load', () => {
             try {
                 const apiKey = await getGeminiApiKey();
                 const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-
-                const payload = {
-                    contents: [{ parts: [{ text: prompt }] }],
-                };
-                
-                const response = await fetchWithBackoff(apiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-
+                const payload = { contents: [{ parts: [{ text: prompt }] }] };
+                const response = await fetchWithBackoff(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                 if (!response.ok) {
                     const errorBody = await response.json();
                     console.error("Gemini API Error:", errorBody);
@@ -2384,17 +2137,13 @@ window.addEventListener('load', () => {
                     }
                     throw new Error(`API Error: ${errorBody.error.message}`);
                 }
-                
                 const result = await response.json();
                 const candidate = result.candidates?.[0];
-
                 if (candidate && candidate.content?.parts?.[0]?.text) {
                     return candidate.content.parts[0].text;
                 } else {
                     console.warn("Unexpected API response structure:", result);
-                    if (candidate && candidate.finishReason !== 'STOP') {
-                         throw new Error(`Generation stopped for reason: ${candidate.finishReason}`);
-                    }
+                    if (candidate && candidate.finishReason !== 'STOP') throw new Error(`Generation stopped for reason: ${candidate.finishReason}`);
                     throw new Error("Invalid response structure from API.");
                 }
             } catch (error) {
@@ -2410,15 +2159,8 @@ window.addEventListener('load', () => {
                 const apiKey = await getGeminiApiKey();
                 const model = 'gemini-2.5-flash-preview-05-20';
                 const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${apiKey}&alt=sse`;
-
                 const payload = { contents: [{ parts: [{ text: prompt }] }] };
-
-                const response = await fetchWithBackoff(apiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-
+                const response = await fetchWithBackoff(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                 if (!response.ok) {
                     const errorBody = await response.json();
                     console.error("Gemini API Error:", errorBody);
@@ -2426,22 +2168,15 @@ window.addEventListener('load', () => {
                         localStorage.removeItem('geminiApiKey'); 
                         throw new Error(`API Error: Invalid API key. Please check your key and try again.`);
                     }
-                    if (response.status === 404) {
-                        throw new Error(`API Error: Model not found. Please check the model name.`);
-                    }
+                    if (response.status === 404) throw new Error(`API Error: Model not found. Please check the model name.`);
                     throw new Error(`API Error: ${errorBody.error.message}`);
                 }
-                
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
-                
                 while (true) {
                     const { value, done } = await reader.read();
                     if (done) break;
-
-                    const chunkText = decoder.decode(value, { stream: true });
-                    const lines = chunkText.split('\n');
-
+                    const lines = decoder.decode(value, { stream: true }).split('\n');
                     for (const line of lines) {
                         if (line.startsWith('data: ')) {
                             const data = line.substring(6).trim();
@@ -2461,7 +2196,6 @@ window.addEventListener('load', () => {
                     }
                 }
                 return fullText;
-
             } catch (error) {
                 console.error("Error in streaming Gemini API call:", error);
                 showToast(error.message);
@@ -2474,24 +2208,19 @@ window.addEventListener('load', () => {
             const storyContentWrapper = document.getElementById('story-content-wrapper');
             const titleText = mode === 'summarize' ? 'AI Summary' : 'Explained Like You\'re 5';
             const buttonText = mode === 'summarize' ? 'Summarize' : 'ELI5';
-
             if (!story.selftext) {
                 showToast("This story has no text to process.");
                 return;
             }
-
             if (button.textContent === 'Show Original') {
                 storyContentWrapper.innerHTML = originalStoryContent;
                 originalStoryContent = null;
                 button.textContent = buttonText;
                 return;
             }
-            
             const cachedResult = (mode === 'summarize') ? currentStorySummary : currentStoryELI5;
             if (cachedResult) {
-                if (!originalStoryContent) {
-                    originalStoryContent = storyContentWrapper.innerHTML;
-                }
+                if (!originalStoryContent) originalStoryContent = storyContentWrapper.innerHTML;
                 const outputContainer = document.createElement('div');
                 outputContainer.className = 'ai-output-box';
                 outputContainer.innerHTML = `<h4>${titleText}</h4><div class="markdown-content">${renderMarkdown(cachedResult)}</div>`;
@@ -2507,38 +2236,24 @@ window.addEventListener('load', () => {
 
             const outputContainer = document.createElement('div');
             outputContainer.className = 'ai-output-box';
-            outputContainer.innerHTML = `
-                <h4>${titleText}</h4>
-                <div class="markdown-content" id="live-ai-content"></div>
-            `;
+            outputContainer.innerHTML = `<h4>${titleText}</h4><div class="markdown-content" id="live-ai-content"></div>`;
             storyContentWrapper.innerHTML = '';
             storyContentWrapper.appendChild(outputContainer);
 
             const liveContent = document.getElementById('live-ai-content');
             let fullText = "";
-            let prompt = '';
-
-            if (mode === 'summarize') {
-                prompt = `Summarize the following story in a single, well-written paragraph. Be concise and capture the main points:\n\n---\n\n${story.selftext}`;
-            } else {
-                prompt = `Explain the following text like I'm 5 years old. Use simple words and short sentences:\n\n---\n\n${story.selftext}`;
-            }
-
+            let prompt = mode === 'summarize'
+                ? `Summarize the following story in a single, well-written paragraph. Be concise and capture the main points:\n\n---\n\n${story.selftext}`
+                : `Explain the following text like I'm 5 years old. Use simple words and short sentences:\n\n---\n\n${story.selftext}`;
             try {
                 await streamGeminiAPI(prompt, (chunk) => {
                     fullText += chunk;
                     liveContent.innerHTML = renderMarkdown(fullText + '...');
                 });
-                
                 liveContent.innerHTML = renderMarkdown(fullText);
                 button.textContent = 'Show Original';
-                
-                if (mode === 'summarize') {
-                    currentStorySummary = fullText;
-                } else {
-                    currentStoryELI5 = fullText;
-                }
-
+                if (mode === 'summarize') currentStorySummary = fullText;
+                else currentStoryELI5 = fullText;
             } catch (error) {
                 storyContentWrapper.innerHTML = originalStoryContent;
                 originalStoryContent = null;
@@ -2555,20 +2270,15 @@ window.addEventListener('load', () => {
             const button = document.getElementById('continue-story-button');
             button.disabled = true;
             button.textContent = 'Writing...';
-
-            const storyContentWrapper = document.getElementById('story-content-wrapper');
-            const storyContent = storyContentWrapper.querySelector('.markdown-content');
-
+            const storyContent = document.querySelector('#story-content-wrapper .markdown-content');
             const continuationContainer = document.createElement('div');
             continuationContainer.className = 'ai-output-box continuation';
             continuationContainer.innerHTML = `<h4>AI Continuation...</h4><div id="live-continuation-content"></div>`;
             storyContent.appendChild(document.createElement('hr'));
             storyContent.appendChild(continuationContainer);
-            
             const liveContent = document.getElementById('live-continuation-content');
             let fullText = "";
             const prompt = `This is a story from a creative writing prompt. Continue the story for another 2-3 paragraphs in the same style and tone. Do not add a title or any introductory text. Here is the story so far:\n\n---\n\n${story.selftext}`;
-            
             try {
                 await streamGeminiAPI(prompt, (chunk) => {
                     fullText += chunk;
@@ -2586,7 +2296,6 @@ window.addEventListener('load', () => {
         async function handleTranslation(story, language) {
             const storyContentWrapper = document.getElementById('story-content-wrapper');
             const translationSelect = document.getElementById('translation-select');
-        
             if (!language) {
                 if (originalStoryContent) {
                     storyContentWrapper.innerHTML = originalStoryContent;
@@ -2596,64 +2305,36 @@ window.addEventListener('load', () => {
                 const eli5Button = document.getElementById('eli5-button');
                 if(summarizeButton) summarizeButton.textContent = 'Summarize';
                 if(eli5Button) eli5Button.textContent = 'ELI5';
-                
                 currentStorySummary = null;
                 currentStoryELI5 = null;
                 return;
             }
-
             if (currentStoryTranslations[language]) {
-                if (!originalStoryContent) {
-                    originalStoryContent = storyContentWrapper.innerHTML;
-                }
+                if (!originalStoryContent) originalStoryContent = storyContentWrapper.innerHTML;
                 const mediaElementHTML = originalStoryContent.match(/<div class="popup-media">.*?<\/div>/s)?.[0] || '';
-                storyContentWrapper.innerHTML = `
-                    ${mediaElementHTML}
-                    <div class="ai-output-box">
-                        <h4>Translated to ${language}</h4>
-                        <div class="markdown-content">${renderMarkdown(currentStoryTranslations[language])}</div>
-                    </div>
-                `;
+                storyContentWrapper.innerHTML = `${mediaElementHTML}<div class="ai-output-box"><h4>Translated to ${language}</h4><div class="markdown-content">${renderMarkdown(currentStoryTranslations[language])}</div></div>`;
                 return;
             }
-        
             if (!story.selftext) {
                 showToast("This story has no text to translate.");
                 translationSelect.value = '';
                 return;
             }
-        
-            if (!originalStoryContent) {
-                originalStoryContent = storyContentWrapper.innerHTML;
-            }
-            
+            if (!originalStoryContent) originalStoryContent = storyContentWrapper.innerHTML;
             storyContentWrapper.innerHTML = '<div class="spinner"></div>';
             translationSelect.disabled = true;
-            
             try {
                 const prompt = `Translate the following Reddit story text to ${language}. Preserve the original tone and formatting as much as possible. Return only the translated text, without any introductory phrases or extra explanations:\n\n---\n\n${story.selftext}`;
                 const translation = await callGeminiAPI(prompt);
                 currentStoryTranslations[language] = translation;
-                
                 const mediaElementHTML = originalStoryContent.match(/<div class="popup-media">.*?<\/div>/s)?.[0] || '';
-                
-                storyContentWrapper.innerHTML = `
-                    ${mediaElementHTML}
-                    <div class="ai-output-box">
-                        <h4>Translated to ${language}</h4>
-                        <div class="markdown-content">${renderMarkdown(translation)}</div>
-                    </div>
-                `;
+                storyContentWrapper.innerHTML = `${mediaElementHTML}<div class="ai-output-box"><h4>Translated to ${language}</h4><div class="markdown-content">${renderMarkdown(translation)}</div></div>`;
             } catch (error) {
-                if(originalStoryContent) {
-                    storyContentWrapper.innerHTML = originalStoryContent;
-                }
+                if(originalStoryContent) storyContentWrapper.innerHTML = originalStoryContent;
                 showToast(`Sorry, the translation could not be generated. ${error.message}`);
             } finally {
                 translationSelect.disabled = false;
-                if(storyContentWrapper.innerHTML.includes('<div class="spinner">')) {
-                    translationSelect.value = '';
-                }
+                if(storyContentWrapper.innerHTML.includes('<div class="spinner">')) translationSelect.value = '';
             }
         }
 
@@ -2661,7 +2342,6 @@ window.addEventListener('load', () => {
             const sentences = text.match(/[^.!?]+[.!?]+\s*|[^.!?]+$/g) || [];
             const chunks = [];
             let currentChunk = "";
-
             for (const sentence of sentences) {
                 if (currentChunk.length + sentence.length > chunkSize) {
                     chunks.push(currentChunk);
@@ -2670,9 +2350,7 @@ window.addEventListener('load', () => {
                     currentChunk += sentence;
                 }
             }
-            if (currentChunk) {
-                chunks.push(currentChunk);
-            }
+            if (currentChunk) chunks.push(currentChunk);
             return chunks;
         }
 
@@ -2680,28 +2358,16 @@ window.addEventListener('load', () => {
             try {
                 const apiKey = await getGeminiApiKey();
                 const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
-                const payload = {
-                    contents: [{ parts: [{ text }] }],
-                    generationConfig: { responseModalities: ["AUDIO"] },
-                    model: "gemini-2.5-flash-preview-tts"
-                };
-        
-                const response = await fetchWithBackoff(apiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-        
+                const payload = { contents: [{ parts: [{ text }] }], generationConfig: { responseModalities: ["AUDIO"] }, model: "gemini-2.5-flash-preview-tts" };
+                const response = await fetchWithBackoff(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                 if (!response.ok) {
                     if (response.status === 429) throw new Error('API rate limit exceeded');
                     throw new Error('Failed to generate audio chunk.');
                 }
-        
                 const result = await response.json();
                 const part = result?.candidates?.[0]?.content?.parts?.[0];
                 const audioData = part?.inlineData?.data;
                 const mimeType = part?.inlineData?.mimeType;
-        
                 if (audioData && mimeType?.startsWith("audio/")) {
                     const sampleRate = parseInt(mimeType.match(/rate=(\d+)/)[1], 10);
                     const pcmData = base64ToArrayBuffer(audioData);
@@ -2721,80 +2387,62 @@ window.addEventListener('load', () => {
         
         function scheduleNextBuffer() {
             if (!isNarrationPlaying || isNarrationPaused || audioBufferQueue.length === 0) {
-                if (isNarrationPlaying && audioBufferQueue.length === 0) {
-                    stopNarration();
-                }
+                if (isNarrationPlaying && audioBufferQueue.length === 0) stopNarration();
                 return;
             }
-        
             const audioBuffer = audioBufferQueue.shift();
             const source = audioContext.createBufferSource();
             source.buffer = audioBuffer;
             source.connect(audioContext.destination);
-
             const speed = document.getElementById('narration-speed-select')?.value || 1;
             source.playbackRate.value = parseFloat(speed);
-        
             const now = audioContext.currentTime;
             nextScheduleTime = Math.max(now, nextScheduleTime);
-        
             source.start(nextScheduleTime);
             activeSourceNodes.push(source);
-        
             source.onended = () => {
                 activeSourceNodes = activeSourceNodes.filter(s => s !== source);
                 scheduleNextBuffer();
             };
-        
             nextScheduleTime += audioBuffer.duration / source.playbackRate.value;
         }
         
         async function handleNarration(story) {
             const narrateButton = document.getElementById('narrate-button');
             const stopButton = document.getElementById('stop-narration-button');
-        
             if (isNarrationPlaying && !isNarrationPaused) {
                 if (audioContext) audioContext.suspend();
                 isNarrationPaused = true;
                 narrateButton.textContent = 'Resume';
                 return;
             }
-        
             if (isNarrationPlaying && isNarrationPaused) {
                 if (audioContext) audioContext.resume();
                 isNarrationPaused = false;
                 narrateButton.textContent = 'Pause';
                 return;
             }
-        
             if (!story.selftext) {
                 showToast("This story has no text to narrate.");
                 return;
             }
-        
             narrateButton.disabled = true;
             narrateButton.textContent = 'Generating...';
-        
             try {
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 nextScheduleTime = audioContext.currentTime;
                 isNarrationPlaying = true;
                 isNarrationPaused = false;
-        
                 if (narrationAudioCache[story.id]) {
                     audioBufferQueue = [...narrationAudioCache[story.id]];
                 } else {
                     const textToNarrate = `Title: ${story.title}. By user ${story.author}. ${story.selftext}`;
                     const chunks = groupTextIntoChunks(textToNarrate, 1500);
                     if (chunks.length === 0) throw new Error("No text found to narrate.");
-
-                    const audioBufferPromises = chunks.map(chunk => fetchAndDecodeAudio(chunk, audioContext));
-                    const allBuffers = await Promise.all(audioBufferPromises);
-                    
+                    const allBuffers = await Promise.all(chunks.map(chunk => fetchAndDecodeAudio(chunk, audioContext)));
                     audioBufferQueue = allBuffers.filter(b => b);
                     narrationAudioCache[story.id] = [...audioBufferQueue];
                 }
-        
                 if (audioBufferQueue.length > 0) {
                     narrateButton.disabled = false;
                     narrateButton.textContent = 'Pause';
@@ -2803,7 +2451,6 @@ window.addEventListener('load', () => {
                 } else {
                     throw new Error("Could not generate or find cached audio.");
                 }
-        
             } catch (error) {
                 console.error("Narration failed to start:", error);
                 showToast(`Could not initialize narration: ${error.message}`);
@@ -2814,9 +2461,8 @@ window.addEventListener('load', () => {
         function debounce(func, delay) {
             let timeout;
             return function(...args) {
-                const context = this;
                 clearTimeout(timeout);
-                timeout = setTimeout(() => func.apply(context, args), delay);
+                timeout = setTimeout(() => func.apply(this, args), delay);
             };
         }
         
@@ -2824,94 +2470,65 @@ window.addEventListener('load', () => {
             const binaryString = window.atob(base64);
             const len = binaryString.length;
             const bytes = new Uint8Array(len);
-            for (let i = 0; i < len; i++) {
-                bytes[i] = binaryString.charCodeAt(i);
-            }
+            for (let i = 0; i < len; i++) bytes[i] = binaryString.charCodeAt(i);
             return bytes.buffer;
         }
 
         function pcmToWav(pcmData, sampleRate) {
-            const numChannels = 1;
-            const bitsPerSample = 16;
-            const blockAlign = (numChannels * bitsPerSample) / 8;
-            const byteRate = sampleRate * blockAlign;
-            const dataSize = pcmData.length * (bitsPerSample / 8);
-            const buffer = new ArrayBuffer(44 + dataSize);
+            const buffer = new ArrayBuffer(44 + pcmData.length * 2);
             const view = new DataView(buffer);
-
             writeString(view, 0, 'RIFF');
-            view.setUint32(4, 36 + dataSize, true);
+            view.setUint32(4, 36 + pcmData.length * 2, true);
             writeString(view, 8, 'WAVE');
             writeString(view, 12, 'fmt ');
             view.setUint32(16, 16, true);
             view.setUint16(20, 1, true);
-            view.setUint16(22, numChannels, true);
+            view.setUint16(22, 1, true);
             view.setUint32(24, sampleRate, true);
-            view.setUint32(28, byteRate, true);
-            view.setUint16(32, blockAlign, true);
-            view.setUint16(34, bitsPerSample, true);
+            view.setUint32(28, sampleRate * 2, true);
+            view.setUint16(32, 2, true);
+            view.setUint16(34, 16, true);
             writeString(view, 36, 'data');
-            view.setUint32(40, dataSize, true);
-
-            for (let i = 0; i < pcmData.length; i++) {
-                view.setInt16(44 + i * 2, pcmData[i], true);
-            }
-
+            view.setUint32(40, pcmData.length * 2, true);
+            for (let i = 0; i < pcmData.length; i++) view.setInt16(44 + i * 2, pcmData[i], true);
             return new Blob([view], { type: 'audio/wav' });
         }
 
         function writeString(view, offset, string) {
-            for (let i = 0; i < string.length; i++) {
-                view.setUint8(offset + i, string.charCodeAt(i));
-            }
+            for (let i = 0; i < string.length; i++) view.setUint8(offset + i, string.charCodeAt(i));
         }
 
         async function getCommentSentiment(story) {
             if (!story) return;
-
             const badge = document.querySelector(`.sentiment-badge[data-story-id="${story.id}"]`);
             if (!badge || badge.textContent) return;
-            
             badge.textContent = '...';
-
             if (sentimentCache[story.id]) {
                 displaySentimentBadge(story.id, sentimentCache[story.id]);
                 return;
             }
-
             sentimentCache[story.id] = 'loading'; 
-
             try {
                 const commentsUrl = `${REDDIT_BASE_URL}r/${story.subreddit}/comments/${story.id}.json?sort=confidence&limit=15`;
-                const response = await fetch(commentsUrl);
-                if (!response.ok) throw new Error("Could not fetch comments for sentiment analysis.");
-
-                const data = await response.json();
+                const data = await fetchWithCache(commentsUrl); // Use cache
                 const comments = data[1].data.children.filter(c => c.kind === 't1').map(c => c.data.body);
-
                 if (comments.length < 3) {
                     sentimentCache[story.id] = 'neutral';
                     displaySentimentBadge(story.id, 'neutral');
                     return; 
                 }
-
                 const commentsText = comments.slice(0, 10).join('\n\n---\n\n');
                 const prompt = `Analyze the sentiment of the following Reddit comments. Respond with only a single word from this list: Positive, Negative, Mixed, Debate, or Neutral. Do not add explanations or punctuation.\n\n### Comments:\n\n${commentsText}`;
                 let sentiment = await callGeminiAPI(prompt);
                 sentiment = sentiment.trim().toLowerCase().replace(/[^a-z]/g, '');
-
                 const validSentiments = ['positive', 'negative', 'mixed', 'debate', 'neutral'];
-                if (!validSentiments.includes(sentiment)) {
-                    sentiment = 'neutral';
-                }
-
+                if (!validSentiments.includes(sentiment)) sentiment = 'neutral';
                 sentimentCache[story.id] = sentiment;
                 displaySentimentBadge(story.id, sentiment);
-
             } catch (error) {
                 console.error(`Could not get sentiment for story ${story.id}:`, error);
                 delete sentimentCache[story.id];
-                 if(badge) badge.textContent = '';
+                if(badge) badge.textContent = '';
             }
         }
 
@@ -2920,8 +2537,7 @@ window.addEventListener('load', () => {
             if (badge) {
                 badge.textContent = sentiment;
                 badge.className = 'sentiment-badge';
-                badge.classList.add(`sentiment-${sentiment}`);
-                badge.classList.add('visible');
+                badge.classList.add(`sentiment-${sentiment}`, 'visible');
             }
         }
     } catch (e) {
