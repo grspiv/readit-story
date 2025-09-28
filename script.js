@@ -76,7 +76,6 @@ window.addEventListener('load', () => {
 
 
         // --- Constants & State ---
-        // **FIX:** Use www.reddit.com to prevent CORS/fetching issues on mobile
         const REDDIT_BASE_URL = 'https://www.reddit.com/';
         const SAVED_STORIES_KEY = 'redditStorytellerSaved';
         const READ_HISTORY_KEY = 'redditStorytellerHistory';
@@ -677,6 +676,10 @@ window.addEventListener('load', () => {
                         }
                     });
 
+                    if (combinedPosts.length === 0) {
+                        throw new Error("No posts found in the specified subreddits.");
+                    }
+                    
                     if (sort === 'new') {
                         combinedPosts.sort((a, b) => b.created_utc - a.created_utc);
                     } else { // For 'hot', 'top', 'rising', sort by score as a best-effort merge
@@ -965,6 +968,7 @@ window.addEventListener('load', () => {
             }
         }
 
+
         function appendComments(postName, commentData) {
             const commentSection = document.getElementById('comment-section');
             if (!commentSection) return;
@@ -1144,7 +1148,7 @@ window.addEventListener('load', () => {
                             ${story.link_flair_text ? `<span class="story-flair">${story.link_flair_text}</span>` : ''}
                             <span class="sentiment-badge" data-story-id="${story.id}"></span>
                         </div>
-                        <h3><a href="https://www.reddit.com${story.permalink}" target="_blank" rel="noopener noreferrer">${story.title}</a></h3>
+                        <h3><a href="${REDDIT_BASE_URL}${story.permalink}" target="_blank" rel="noopener noreferrer">${story.title}</a></h3>
                         <p class="author" title="View u/${story.author}'s profile">by u/${story.author}</p>
                         ${readAtTimeHTML}
                         <p class="reading-time">${readingTime} (${(story.selftext || '').split(/\s+/).length} words)</p>
@@ -1155,7 +1159,7 @@ window.addEventListener('load', () => {
                                 <button class="icon-button sentiment-button" title="Analyze Comment Sentiment">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="8" y1="15" x2="16" y2="15"></line><line x1="9" y1="9" x2="9.01" y2="9"></line><line x1="15" y1="9" x2="15.01" y2="9"></line></svg>
                                 </button>
-                                <a href="https://www.reddit.com${story.permalink}" target="_blank" rel="noopener noreferrer" class="icon-button" title="View on Reddit">
+                                <a href="${REDDIT_BASE_URL}${story.permalink}" target="_blank" rel="noopener noreferrer" class="icon-button" title="View on Reddit">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
                                 </a>
                                 <button class="save-button ${isSaved ? 'saved' : ''}">${isSaved ? 'Remove' : 'Save'}</button>
@@ -1177,7 +1181,7 @@ window.addEventListener('load', () => {
             const story = allFetchedPosts.find(p => p.id === storyId) || getHistory().find(p => p.id === storyId) || getSavedStories().find(p => p.id === storyId);
             if (!story) return;
 
-            const redditLink = `https://www.reddit.com${story.permalink}`;
+            const redditLink = `${REDDIT_BASE_URL}${story.permalink}`;
 
             if (e.target.closest('.read-button')) {
                 e.stopPropagation();
@@ -1581,7 +1585,7 @@ window.addEventListener('load', () => {
                 const storyContent = `Title: ${story.title}\r\n` +
                                      `Author: u/${story.author}\r\n` +
                                      `Subreddit: ${story.subreddit_name_prefixed}\r\n` +
-                                     `Link: https://www.reddit.com${story.permalink}\r\n` +
+                                     `Link: ${REDDIT_BASE_URL}${story.permalink}\r\n` +
                                      `Score: ${story.score}\r\n` +
                                      `Comments: ${story.num_comments}\r\n\r\n` +
                                      `====================\r\n\r\n` +
@@ -1775,18 +1779,16 @@ window.addEventListener('load', () => {
             seriesNavigation.innerHTML = '';
             currentSeries = { parts: [], currentIndex: -1 };
             
-            // Regex to find "Part X" or similar patterns.
             const partRegex = /(?:part|chapter)\s*(\d+)/i;
             const match = story.title.match(partRegex);
             
-            if (!match) return; // Not part of a detectable series
+            if (!match) return;
 
             const currentPart = parseInt(match[1], 10);
-            // Get the base title by removing the part indicator and any surrounding characters.
             const baseTitle = story.title.replace(partRegex, '').replace(/[\[\]()|]/g, '').trim();
 
             try {
-                const url = `${REDDIT_API_BASE_URL}user/${story.author}/submitted.json?sort=new&limit=100`;
+                const url = `${REDDIT_BASE_URL}user/${story.author}/submitted.json?sort=new&limit=100`;
                 const response = await fetch(url);
                 if (!response.ok) return;
                 const data = await response.json();
@@ -1843,7 +1845,7 @@ window.addEventListener('load', () => {
 
         // --- Comment Navigator Functions ---
         function setupCommentNavigator() {
-            if (topLevelComments.length < 5) { // Only show for 5+ comments
+            if (topLevelComments.length < 5) {
                 commentNavigator.style.display = 'none';
                 return;
             }
@@ -1863,7 +1865,6 @@ window.addEventListener('load', () => {
         function navigateComments(direction) {
             if (topLevelComments.length === 0) return;
 
-            // Remove highlight from previous comment
             if (currentCommentIndex > -1 && topLevelComments[currentCommentIndex]) {
                 topLevelComments[currentCommentIndex].classList.remove('active-comment');
             }
@@ -1900,8 +1901,8 @@ window.addEventListener('load', () => {
 
             try {
                 const [aboutRes, submittedRes] = await Promise.all([
-                    fetch(`${REDDIT_API_BASE_URL}user/${author}/about.json`),
-                    fetch(`${REDDIT_API_BASE_URL}user/${author}/submitted.json?limit=10`)
+                    fetch(`${REDDIT_BASE_URL}user/${author}/about.json`),
+                    fetch(`${REDDIT_BASE_URL}user/${author}/submitted.json?limit=10`)
                 ]);
 
                 if (!aboutRes.ok || !submittedRes.ok) {
@@ -2050,7 +2051,6 @@ window.addEventListener('load', () => {
             if (allTags.size > 0) {
                 savedTagsFilter.style.display = 'block';
                 
-                // "All" button
                 const allBtn = document.createElement('button');
                 allBtn.className = 'tag-filter-button';
                 allBtn.textContent = 'All';
@@ -2061,7 +2061,6 @@ window.addEventListener('load', () => {
                 };
                 tagsContainer.appendChild(allBtn);
 
-                // Individual tag buttons
                 [...allTags].sort().forEach(tag => {
                     const tagBtn = document.createElement('button');
                     tagBtn.className = 'tag-filter-button';
@@ -2097,7 +2096,7 @@ window.addEventListener('load', () => {
             if (savedPosition) {
                 setTimeout(() => {
                     popupBody.scrollTop = savedPosition;
-                }, 100); // Small delay to allow content to render
+                }, 100);
             }
         }
 
@@ -2106,7 +2105,7 @@ window.addEventListener('load', () => {
             wordCloudContainer.innerHTML = '<div class="spinner"></div>';
             wordCloudOverlay.classList.add('active');
 
-            setTimeout(() => { // Use timeout to allow spinner to render
+            setTimeout(() => {
                 try {
                     const commentNodes = popupBody.querySelectorAll('.comment-body');
                     let allText = '';
@@ -2142,7 +2141,7 @@ window.addEventListener('load', () => {
             return Object.entries(counts)
                 .map(([text, size]) => ({ text, size }))
                 .sort((a, b) => b.size - a.size)
-                .slice(0, 150); // Limit to top 150 words
+                .slice(0, 150);
         }
 
         function drawWordCloud(words) {
@@ -2152,15 +2151,15 @@ window.addEventListener('load', () => {
 
             const isDarkTheme = document.body.classList.contains('dark');
             const colorScale = d3.scaleOrdinal(isDarkTheme ? 
-                ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"] : // Vibrant colors for dark bg
-                d3.schemeCategory10); // Default for light bg
+                ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"] :
+                d3.schemeCategory10);
 
             const layout = d3.layout.cloud()
                 .size([width, height])
-                .words(words.map(d => ({ text: d.text, size: 10 + Math.sqrt(d.size) * 7 }))) // Adjusted scaling
+                .words(words.map(d => ({ text: d.text, size: 10 + Math.sqrt(d.size) * 7 })))
                 .padding(5)
-                .rotate(() => (Math.random() > 0.85 ? 90 : 0)) // Mostly horizontal
-                .font(window.getComputedStyle(document.body).fontFamily) // Use body font
+                .rotate(() => (Math.random() > 0.85 ? 90 : 0))
+                .font(window.getComputedStyle(document.body).fontFamily)
                 .fontSize(d => d.size)
                 .on("end", draw);
 
@@ -2195,8 +2194,8 @@ window.addEventListener('load', () => {
                 btn.textContent = 'Live Comments';
                 showToast('Live comments stopped.');
             } else {
-                fetchNewComments(); // Fetch immediately, then start interval
-                liveCommentsInterval = setInterval(fetchNewComments, 30000); // 30 seconds
+                fetchNewComments();
+                liveCommentsInterval = setInterval(fetchNewComments, 30000);
                 btn.classList.add('active');
                 btn.textContent = 'Live (Stop)';
                 showToast('Live comments started. New comments will be highlighted.');
@@ -2210,9 +2209,9 @@ window.addEventListener('load', () => {
             if (!story) return;
 
             try {
-                const commentsUrl = `${REDDIT_API_BASE_URL}r/${story.subreddit}/comments/${story.id}.json?sort=new&limit=25`;
+                const commentsUrl = `${REDDIT_BASE_URL}r/${story.subreddit}/comments/${story.id}.json?sort=new&limit=25`;
                 const response = await fetch(commentsUrl);
-                if (!response.ok) return; // Fail silently
+                if (!response.ok) return;
                 const data = await response.json();
                 const newComments = data[1].data.children.filter(c => c.kind === 't1');
                 
@@ -2239,7 +2238,6 @@ window.addEventListener('load', () => {
                 }
             } catch(e) {
                 console.error("Failed to fetch live comments:", e);
-                // Fail silently
             }
         }
         
@@ -2251,14 +2249,14 @@ window.addEventListener('load', () => {
                 quickLookTimeout = setTimeout(() => {
                     showQuickLook(card);
                     positionQuickLook(e);
-                }, 300); // 300ms delay before showing
+                }, 300);
             }
         }
         
         function showQuickLook(card) {
             const storyId = card.dataset.storyId;
             const story = allFetchedPosts.find(p => p.id === storyId);
-            if (!story || !story.selftext) return; // Don't show for stories without text
+            if (!story || !story.selftext) return;
 
             quickLookPopup.innerHTML = `
                 <h4>${story.title}</h4>
@@ -2348,7 +2346,7 @@ window.addEventListener('load', () => {
                         await new Promise(resolve => setTimeout(resolve, delay));
                         continue;
                     }
-                    return response; // Success
+                    return response;
                 } catch (e) {
                     lastError = e;
                     const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
@@ -2500,7 +2498,7 @@ window.addEventListener('load', () => {
                 storyContentWrapper.innerHTML = '';
                 storyContentWrapper.appendChild(outputContainer);
                 button.textContent = 'Show Original';
-                return; // Use cached version and exit
+                return;
             }
 
             button.disabled = true;
@@ -2522,7 +2520,7 @@ window.addEventListener('load', () => {
 
             if (mode === 'summarize') {
                 prompt = `Summarize the following story in a single, well-written paragraph. Be concise and capture the main points:\n\n---\n\n${story.selftext}`;
-            } else { // eli5
+            } else {
                 prompt = `Explain the following text like I'm 5 years old. Use simple words and short sentences:\n\n---\n\n${story.selftext}`;
             }
 
@@ -2537,7 +2535,7 @@ window.addEventListener('load', () => {
                 
                 if (mode === 'summarize') {
                     currentStorySummary = fullText;
-                } else { // eli5
+                } else {
                     currentStoryELI5 = fullText;
                 }
 
@@ -2581,7 +2579,7 @@ window.addEventListener('load', () => {
                  showToast(`Sorry, the story continuation could not be generated. ${error.message}`);
                  continuationContainer.remove();
             } finally {
-                button.style.display = 'none'; // Hide button after use
+                button.style.display = 'none';
             }
         }
 
@@ -2813,7 +2811,6 @@ window.addEventListener('load', () => {
             }
         }
         
-        // --- Utility Functions ---
         function debounce(func, delay) {
             let timeout;
             return function(...args) {
@@ -2823,7 +2820,6 @@ window.addEventListener('load', () => {
             };
         }
         
-        // --- TTS Audio Helper Functions ---
         function base64ToArrayBuffer(base64) {
             const binaryString = window.atob(base64);
             const len = binaryString.length;
@@ -2843,20 +2839,17 @@ window.addEventListener('load', () => {
             const buffer = new ArrayBuffer(44 + dataSize);
             const view = new DataView(buffer);
 
-            // RIFF header
             writeString(view, 0, 'RIFF');
             view.setUint32(4, 36 + dataSize, true);
             writeString(view, 8, 'WAVE');
-            // fmt chunk
             writeString(view, 12, 'fmt ');
             view.setUint32(16, 16, true);
-            view.setUint16(20, 1, true); // PCM
+            view.setUint16(20, 1, true);
             view.setUint16(22, numChannels, true);
             view.setUint32(24, sampleRate, true);
             view.setUint32(28, byteRate, true);
             view.setUint16(32, blockAlign, true);
             view.setUint16(34, bitsPerSample, true);
-            // data chunk
             writeString(view, 36, 'data');
             view.setUint32(40, dataSize, true);
 
@@ -2873,7 +2866,6 @@ window.addEventListener('load', () => {
             }
         }
 
-        // --- New AI Functions ---
         async function getCommentSentiment(story) {
             if (!story) return;
 
@@ -2890,7 +2882,7 @@ window.addEventListener('load', () => {
             sentimentCache[story.id] = 'loading'; 
 
             try {
-                const commentsUrl = `${REDDIT_API_BASE_URL}r/${story.subreddit}/comments/${story.id}.json?sort=confidence&limit=15`;
+                const commentsUrl = `${REDDIT_BASE_URL}r/${story.subreddit}/comments/${story.id}.json?sort=confidence&limit=15`;
                 const response = await fetch(commentsUrl);
                 if (!response.ok) throw new Error("Could not fetch comments for sentiment analysis.");
 
@@ -2927,7 +2919,7 @@ window.addEventListener('load', () => {
             const badge = document.querySelector(`.sentiment-badge[data-story-id="${storyId}"]`);
             if (badge) {
                 badge.textContent = sentiment;
-                badge.className = 'sentiment-badge'; // Reset classes
+                badge.className = 'sentiment-badge';
                 badge.classList.add(`sentiment-${sentiment}`);
                 badge.classList.add('visible');
             }
