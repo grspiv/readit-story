@@ -132,7 +132,7 @@ body.kizzie {
 }
 
 body {
-    visibility: hidden; /* Hide body until script confirms it's ready */
+    visibility: hidden;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
     background-color: var(--bg-color);
     color: var(--text-color);
@@ -145,13 +145,13 @@ body {
     background-blend-mode: multiply;
     animation: background-move 15s ease-in-out infinite alternate;
     transition: background-color 0.3s ease, color 0.3s ease;
-    -webkit-tap-highlight-color: transparent; /* Disable tap highlight on iOS */
+    -webkit-tap-highlight-color: transparent;
     -webkit-font-smoothing: antialiased;
     overflow-wrap: break-word;
 }
 
 body.loaded {
-    visibility: visible; /* Make body visible once initial styles are applied */
+    visibility: visible;
 }
 
 @keyframes background-move {
@@ -282,12 +282,10 @@ body.loaded {
     margin: 30px 0;
 }
 
-/* FIX: Center text content since JS sets display:flex on this button */
 #mark-all-read-button {
     justify-content: center;
 }
 
-/* New styles for dedicated views */
 .dedicated-view {
     background-color: var(--card-bg);
     border: 1px solid var(--border-color);
@@ -480,15 +478,16 @@ body.loaded {
 }
 
 .subreddit-info {
-    display: none; /* Hidden by default */
+    display: none;
     background-color: var(--card-bg);
     border-radius: 16px;
     padding: 20px;
     margin-bottom: 30px;
     box-shadow: 0 6px 12px var(--shadow-color);
-    align-items: center;
     gap: 20px;
     border-left: 5px solid var(--highlight-color);
+    /* --- FIX 1: Allow children to stretch vertically --- */
+    /* align-items: center; (removed) */
 }
 .subreddit-icon {
     width: 60px;
@@ -496,14 +495,15 @@ body.loaded {
     border-radius: 50%;
     object-fit: cover;
     flex-shrink: 0;
+    /* --- FIX 2: Prevent icon from stretching and keep it centered --- */
+    align-self: center;
 }
 .subreddit-details {
     flex-grow: 1;
-    /* --- START: ALIGNMENT FIX --- */
+    /* --- FIX 3: Center the text content vertically inside this container --- */
     display: flex;
     flex-direction: column;
     justify-content: center;
-    /* --- END: ALIGNMENT FIX --- */
 }
 .subreddit-info-header {
     display: flex;
@@ -538,7 +538,6 @@ body.loaded {
     align-self: flex-start;
 }
 
-/* --- START: FIXED MULTIREDDIT STYLES --- */
 .multi-subreddit-item {
     display: flex;
     align-items: center;
@@ -577,8 +576,8 @@ body.loaded {
     color: var(--text-color);
     opacity: 0.8;
 }
-/* --- END: FIXED MULTIREDDIT STYLES --- */
 
+/* The rest of the CSS file continues unchanged below */
 
 .story-container {
     transition: all 0.4s ease;
@@ -695,7 +694,7 @@ body.loaded {
     font-size: 1.3em;
     color: var(--heading-color);
     margin: 0 0 5px;
-    overflow-wrap: break-word; /* Prevent long titles from overflowing */
+    overflow-wrap: break-word;
 }
 
 .story-card h3 a {
@@ -802,14 +801,12 @@ body.loaded {
 
 /* --- START: LAYOUT STYLES --- */
 
-/* 1. Grid View (Default) */
 .story-container.grid-view {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
     gap: 30px;
 }
 
-/* 2. List View Styles */
 .story-container.list-view {
     display: grid;
     grid-template-columns: 1fr;
@@ -837,7 +834,6 @@ body.loaded {
     }
 }
 
-/* 3. Classic View Styles */
 .story-container.classic-view {
     display: flex;
     flex-direction: column;
@@ -885,7 +881,6 @@ body.loaded {
     min-width: 80px;
 }
 
-/* Gallery View (can be combined with other layouts) */
 .story-container.gallery-view {
     display: grid;
     grid-template-columns: 1fr;
@@ -934,7 +929,6 @@ body.loaded {
 
 /* --- END: LAYOUT STYLES --- */
 
-/* --- START: NEW FEATURE STYLES --- */
 .sentiment-badge {
     font-size: 0.75em;
     font-weight: bold;
@@ -959,8 +953,6 @@ body.loaded {
 .narration-options .switch {
     margin-right: 5px;
 }
-
-/* --- END: NEW FEATURE STYLES --- */
 
 .crosspost-info {
     font-size: 0.9em;
@@ -1028,15 +1020,15 @@ body.loaded {
     border-radius: 16px;
     width: 100%;
     max-width: 800px;
-    max-height: 90vh; /* Fallback for older browsers */
-    max-height: 90svh; /* More reliable unit for mobile */
+    max-height: 90vh;
+    max-height: 90svh;
     overflow-y: auto;
     box-shadow: 0 15px 30px rgba(0, 0, 0, 0.3);
     transform: scale(0.9);
     transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), background-color 0.3s ease;
     display: flex;
     flex-direction: column;
-    -webkit-overflow-scrolling: touch; /* Momentum scrolling on iOS */
+    -webkit-overflow-scrolling: touch;
     position: relative;
 }
 
@@ -1422,7 +1414,6 @@ body.loaded {
 }
 
 
-/* Switch toggle for NSFW */
 .switch { position: relative; display: inline-block; width: 50px; height: 24px; }
 .switch input { opacity: 0; width: 0; height: 0; }
 .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; }
@@ -1432,7 +1423,6 @@ input:checked + .slider:before { transform: translateX(26px); }
 .slider.round { border-radius: 24px; }
 .slider.round:before { border-radius: 50%; }
 
-/* Markdown Content Styles */
 .markdown-content p {
     margin-top: 0;
     margin-bottom: 1em;
@@ -1481,7 +1471,6 @@ input:checked + .slider:before { transform: translateX(26px); }
     text-decoration: underline;
 }
 
-/* Comment Navigator */
 .comment-navigator {
     display: flex;
     justify-content: center;
@@ -1517,7 +1506,6 @@ input:checked + .slider:before { transform: translateX(26px); }
 }
 
 
-/* Series Navigation */
 .series-navigation {
     display: flex;
     justify-content: space-between;
@@ -1542,7 +1530,6 @@ input:checked + .slider:before { transform: translateX(26px); }
     cursor: not-allowed;
 }
 
-/* Saved Story Tags & Notes */
 .saved-story-tags-container,
 .saved-story-notes-container {
     padding: 15px 20px;
@@ -1627,10 +1614,9 @@ input:checked + .slider:before { transform: translateX(26px); }
 }
 
 
-/* Word Cloud */
 #word-cloud-container {
     width: 100%;
-    height: 400px; /* Or adjust as needed */
+    height: 400px;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -1643,7 +1629,6 @@ input:checked + .slider:before { transform: translateX(26px); }
 }
 
 
-/* User Profile Popup */
 .user-profile-info {
     display: flex;
     gap: 20px;
@@ -1697,7 +1682,6 @@ input:checked + .slider:before { transform: translateX(26px); }
     color: #888;
 }
 
-/* Quick Look Popup */
 #quick-look-popup {
     position: fixed;
     z-index: 1100;
@@ -1708,7 +1692,7 @@ input:checked + .slider:before { transform: translateX(26px); }
     border-radius: 12px;
     padding: 15px;
     max-width: 400px;
-    pointer-events: none; /* Can't interact with it */
+    pointer-events: none;
     opacity: 0;
     visibility: hidden;
     transition: opacity 0.2s ease, visibility 0.2s ease;
@@ -1726,12 +1710,11 @@ input:checked + .slider:before { transform: translateX(26px); }
     margin: 0;
     font-size: 0.95em;
     display: -webkit-box;
-    -webkit-line-clamp: 8; /* Show more text */
+    -webkit-line-clamp: 8;
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
 
-/* API Key Modal */
 .api-key-modal-content {
     padding: 25px;
 }
@@ -1755,7 +1738,6 @@ input:checked + .slider:before { transform: translateX(26px); }
     margin-top: 20px;
 }
 
-/* AI Output Box */
 .ai-output-box {
     background-color: var(--bg-color);
     border: 1px solid var(--border-color);
@@ -1777,7 +1759,7 @@ input:checked + .slider:before { transform: translateX(26px); }
 
 @media (max-width: 900px) {
     .app-header h1 {
-        flex-basis: auto; /* Allow title and controls to share space */
+        flex-basis: auto;
     }
     .header-controls {
         justify-content: space-around;
@@ -1791,7 +1773,6 @@ input:checked + .slider:before { transform: translateX(26px); }
         padding: 15px;
     }
 
-    /* Make main controls stack vertically */
     .controls {
         flex-direction: column;
         align-items: stretch;
@@ -1828,7 +1809,7 @@ input:checked + .slider:before { transform: translateX(26px); }
 
     .view-actions {
         flex-direction: column;
-        align-items: stretch; /* Make buttons full-width */
+        align-items: stretch;
     }
 
     .view-actions > div {
@@ -1841,13 +1822,13 @@ input:checked + .slider:before { transform: translateX(26px); }
         display: flex;
         justify-content: center;
         align-items: center;
-        width: auto; /* Let it size to content */
+        width: auto;
         flex-grow: 0;
         padding: 10px;
     }
 
     .advanced-filters {
-        display: none; /* Hide advanced filters by default on mobile */
+        display: none;
         margin-top: 20px;
         max-height: 0;
         overflow: hidden;
@@ -1859,7 +1840,7 @@ input:checked + .slider:before { transform: translateX(26px); }
         flex-direction: column;
         align-items: stretch;
         gap: 15px;
-        max-height: 1000px; /* Arbitrary large value to allow content to expand */
+        max-height: 1000px;
     }
 
     .popup-content {
