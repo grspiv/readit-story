@@ -499,6 +499,11 @@ body.loaded {
 }
 .subreddit-details {
     flex-grow: 1;
+    /* --- START: ALIGNMENT FIX --- */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    /* --- END: ALIGNMENT FIX --- */
 }
 .subreddit-info-header {
     display: flex;
