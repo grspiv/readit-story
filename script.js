@@ -76,7 +76,8 @@ window.addEventListener('load', () => {
 
 
         // --- Constants & State ---
-        const REDDIT_API_BASE_URL = 'https://api.reddit.com/';
+        // **FIX:** Use www.reddit.com to prevent CORS/fetching issues on mobile
+        const REDDIT_BASE_URL = 'https://www.reddit.com/';
         const SAVED_STORIES_KEY = 'redditStorytellerSaved';
         const READ_HISTORY_KEY = 'redditStorytellerHistory';
         const SUBREDDIT_HISTORY_KEY = 'redditSubredditHistory';
@@ -143,9 +144,8 @@ window.addEventListener('load', () => {
         galleryToggleButton.addEventListener('click', handleGalleryToggle);
         nsfwToggle.addEventListener('change', () => applyNSFWPreference(nsfwToggle.checked, true));
         
-        // Use a single form submit listener for reliability on all devices
         searchForm.addEventListener('submit', (e) => {
-            e.preventDefault(); // Prevent page reload
+            e.preventDefault();
             switchToView('browsing', { refresh: true });
         });
 
@@ -198,7 +198,6 @@ window.addEventListener('load', () => {
         addTagInput.addEventListener('keydown', handleAddTag);
         storyContainer.addEventListener('click', handleStoryContainerClick);
 
-        // Conditionally add hover listeners for desktop only
         const isDesktop = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
         if (isDesktop) {
             storyContainer.addEventListener('mouseover', handleQuickLook);
@@ -210,14 +209,12 @@ window.addEventListener('load', () => {
             });
         }
         
-        closeApiKeyPopup.addEventListener('click', () => hideApiKeyModal(true)); // Pass true to indicate rejection
+        closeApiKeyPopup.addEventListener('click', () => hideApiKeyModal(true));
         saveApiKeyButton.addEventListener('click', handleSaveApiKey);
 
-        // Make body visible now that initial styles and layout are applied
         document.body.classList.add('loaded');
 
 
-        // --- Main View Controller ---
         function switchToView(view, options = {}) {
             if (view === currentView && view !== 'browsing') {
                 switchToView('browsing');
@@ -225,28 +222,24 @@ window.addEventListener('load', () => {
             }
 
             currentView = view;
-            activeTagFilter = null; // Reset tag filter when switching views
+            activeTagFilter = null;
             window.scrollTo({ top: 0, behavior: 'smooth' });
 
-            // Hide all view-specific sections
             [controlsContainer, savedStoriesView, historyView, subredditInfoPanel, markAllReadButton].forEach(el => {
                 if(el) el.style.display = 'none';
             });
             [viewSavedButton, viewHistoryButton].forEach(btn => btn.classList.remove('active'));
             
-            // Reset button text
             viewSavedButton.textContent = 'Saved Stories';
             viewHistoryButton.textContent = 'History';
-
 
             if (view === 'browsing') {
                 if(controlsContainer) controlsContainer.style.display = 'block';
                 if(markAllReadButton) markAllReadButton.style.display = 'flex';
                 
                 if (options && options.refresh) {
-                    // **FIX:** Use unified sanitizer for multireddit input
                     const subreddit = sanitizeSubredditInput(subredditInput.value);
-                    subredditInput.value = subreddit; // Update input field with sanitized value
+                    subredditInput.value = subreddit;
                     
                     const sort = sortSelect.value;
                     const timeRange = timeRangeSelect.value;
@@ -257,7 +250,6 @@ window.addEventListener('load', () => {
                         showErrorPopup("Please enter a subreddit name.");
                     }
                 } else {
-                    // When just switching back, restore the previous browsing view
                     storyContainer.innerHTML = '';
                     displayStories(allFetchedPosts);
                     renderFilteredStories();
@@ -287,28 +279,19 @@ window.addEventListener('load', () => {
         }
 
         // --- Functions ---
-        
-        /**
-         * **FIX:** Centralized function to sanitize multireddit strings.
-         * This ensures consistent behavior for initial searches and "load more" actions.
-         * @param {string} input The raw subreddit input string.
-         * @returns {string} A cleaned string (e.g., "python+learnpython").
-         */
         function sanitizeSubredditInput(input) {
             if (!input) return '';
             return input
                 .trim()
                 .split('+')
                 .map(s => s.trim())
-                .filter(Boolean) // Removes empty strings from "++" or " + "
+                .filter(Boolean)
                 .join('+');
         }
 
         function applyTheme(theme) {
-            // Remove all possible theme classes, preserving essential layout classes
             document.body.classList.remove('dark', 'sepia', 'slate', 'forest', 'solarized-light', 'dracula', 'kaydoh', 'kizzie');
             
-            // Add the new theme class if it's not the default light theme
             if (theme !== 'light') {
                 document.body.classList.add(theme);
             }
@@ -320,9 +303,7 @@ window.addEventListener('load', () => {
         function applyLayout(layout) {
             const allLayoutClasses = ['grid-view', 'list-view', 'classic-view'];
             storyContainer.classList.remove(...allLayoutClasses);
-            
             storyContainer.classList.add(`${layout}-view`);
-        
             localStorage.setItem(LAYOUT_PREFERENCE_KEY, layout);
             layoutSelect.value = layout;
         }
@@ -350,7 +331,6 @@ window.addEventListener('load', () => {
             collapseCommentsToggle.checked = shouldCollapse;
             localStorage.setItem(COLLAPSE_COMMENTS_KEY, shouldCollapse);
             if (shouldRender && popupOverlay.classList.contains('active')) {
-                // If a story is open, re-render its comments with the new setting
                 const commentsContainer = document.getElementById('comment-section');
                 if (commentsContainer) {
                     commentsContainer.querySelectorAll('.comment-card').forEach(card => {
@@ -377,7 +357,7 @@ window.addEventListener('load', () => {
             const randomSub = RANDOM_SUBREDDITS[Math.floor(Math.random() * RANDOM_SUBREDDITS.length)];
             subredditInput.value = randomSub;
             searchInput.value = '';
-            if (toggleFiltersButton.offsetParent !== null) { // Check if filters button is visible (mobile)
+            if (toggleFiltersButton.offsetParent !== null) {
                 advancedFilters.classList.remove('open');
                 toggleFiltersButton.classList.remove('active');
             }
@@ -388,19 +368,19 @@ window.addEventListener('load', () => {
             showToast('Finding a great story for you...');
             surpriseButton.disabled = true;
             surpriseButton.classList.add('pulse-active');
-            if (toggleFiltersButton.offsetParent !== null) { // Check if filters button is visible (mobile)
+            if (toggleFiltersButton.offsetParent !== null) {
                 advancedFilters.classList.remove('open');
                 toggleFiltersButton.classList.remove('active');
             }
 
             const randomSub = RANDOM_SUBREDDITS[Math.floor(Math.random() * RANDOM_SUBREDDITS.length)];
-            const url = `${REDDIT_API_BASE_URL}r/${randomSub}/top.json?t=year&limit=50`;
+            const url = `${REDDIT_BASE_URL}r/${randomSub}/top.json?t=year&limit=50`;
 
             try {
                 const response = await fetch(url);
                 if (!response.ok) throw new Error('Could not fetch top stories.');
                 const data = await response.json();
-                const stories = data.data.children.map(p => p.data).filter(p => p.selftext); // Only stories with text
+                const stories = data.data.children.map(p => p.data).filter(p => p.selftext);
 
                 if (stories.length === 0) {
                     throw new Error(`No text-based stories found in r/${randomSub}.`);
@@ -424,7 +404,6 @@ window.addEventListener('load', () => {
         }
 
         function handleLoadMore() {
-            // **FIX:** Use unified sanitizer for multireddit input
             const subreddit = sanitizeSubredditInput(subredditInput.value);
             const sort = sortSelect.value;
             const timeRange = timeRangeSelect.value;
@@ -468,7 +447,7 @@ window.addEventListener('load', () => {
         }
 
         function closePopup() {
-            saveReadingPosition(); // Save position on close
+            saveReadingPosition();
             stopNarration(); 
             if (liveCommentsInterval) {
                 clearInterval(liveCommentsInterval);
@@ -481,7 +460,6 @@ window.addEventListener('load', () => {
             galleryPrevButton.style.display = 'none';
             galleryNextButton.style.display = 'none';
             
-            // Clear all story-specific caches
             currentStoryId = null;
             originalStoryContent = null;
             currentStorySummary = null;
@@ -531,7 +509,7 @@ window.addEventListener('load', () => {
 
         async function fetchSubredditInfo(subreddit) {
             try {
-                const response = await fetch(`${REDDIT_API_BASE_URL}r/${subreddit}/about.json`);
+                const response = await fetch(`${REDDIT_BASE_URL}r/${subreddit}/about.json`);
                 if (!response.ok) throw new Error('Could not fetch subreddit info.');
                 const data = await response.json();
                 const info = data.data;
@@ -597,19 +575,19 @@ window.addEventListener('load', () => {
         }
 
         async function fetchMultiSubredditInfo(subreddits) {
-            subredditInfoPanel.innerHTML = ''; // Clear previous content
+            subredditInfoPanel.innerHTML = '';
             subredditInfoPanel.style.display = 'flex';
             subredditInfoPanel.style.flexWrap = 'wrap'; 
             subredditInfoPanel.style.gap = '15px'; 
 
             const promises = subreddits.map(sub => 
-                fetch(`${REDDIT_API_BASE_URL}r/${sub}/about.json`)
-                    .then(res => res.ok ? res.json() : null) // Return null on error to not break Promise.all
+                fetch(`${REDDIT_BASE_URL}r/${sub}/about.json`)
+                    .then(res => res.ok ? res.json() : null)
             );
 
             try {
                 const results = await Promise.all(promises);
-                const infos = results.filter(Boolean).map(data => data.data); // Filter out failed requests
+                const infos = results.filter(Boolean).map(data => data.data);
 
                 if (infos.length === 0) {
                     subredditInfoPanel.style.display = 'none';
@@ -628,7 +606,6 @@ window.addEventListener('load', () => {
 
                 subredditInfoPanel.innerHTML = infoHTML;
                 
-                // Add event listeners for the new links
                 subredditInfoPanel.querySelectorAll('.multi-subreddit-link').forEach(link => {
                     link.addEventListener('click', (e) => {
                         e.preventDefault();
@@ -650,11 +627,6 @@ window.addEventListener('load', () => {
 
             if (!loadMore) {
                 scrollToTop();
-                const isMultiReddit = subreddit.includes('+');
-                if (!isMultiReddit && !query.toLowerCase().startsWith('author:')) {
-                    saveSubredditToHistory(subreddit);
-                }
-
                 allFetchedPosts = [];
                 currentAfterToken = null;
                 flairFilterInput.value = '';
@@ -662,6 +634,11 @@ window.addEventListener('load', () => {
                 minCommentsInput.value = '';
                 storyContainer.innerHTML = '';
 
+                const isMultiReddit = subreddit.includes('+');
+                if (!isMultiReddit && !query.toLowerCase().startsWith('author:')) {
+                    saveSubredditToHistory(subreddit);
+                }
+                
                 const isSearch = query.length > 0;
                 if (isSearch) {
                     subredditInfoPanel.style.display = 'none';
@@ -678,11 +655,59 @@ window.addEventListener('load', () => {
             showLoading(true, loadMore);
             storiesHeading.textContent = query ? `Searching for "${query}" in r/${subreddit}` : `Showing stories from r/${subreddit}`;
             
+            const isMultiReddit = subreddit.includes('+');
+
+            // --- START: NEW MULTIREDDIT FETCH LOGIC ---
+            if (isMultiReddit && !query && !loadMore) {
+                currentAfterToken = null; // Disable infinite scroll for multi-reddits
+                showToast("Infinite scroll is disabled for multireddit view.");
+
+                try {
+                    const subreddits = sanitizeSubredditInput(subreddit).split('+');
+                    const promises = subreddits.map(sub => {
+                        const url = `${REDDIT_BASE_URL}r/${sub}/${sort}.json?limit=50&t=${timeRange}`; // Fetch more posts
+                        return fetch(url).then(res => res.ok ? res.json() : null);
+                    });
+
+                    const results = await Promise.all(promises);
+                    let combinedPosts = [];
+                    results.forEach(result => {
+                        if (result && result.data && result.data.children) {
+                            combinedPosts = combinedPosts.concat(result.data.children.map(p => p.data));
+                        }
+                    });
+
+                    if (sort === 'new') {
+                        combinedPosts.sort((a, b) => b.created_utc - a.created_utc);
+                    } else { // For 'hot', 'top', 'rising', sort by score as a best-effort merge
+                        combinedPosts.sort((a, b) => b.score - a.score);
+                    }
+
+                    const uniquePosts = Array.from(new Map(combinedPosts.map(post => [post.id, post])).values());
+                    
+                    allFetchedPosts = uniquePosts;
+                    displayStories(allFetchedPosts);
+                    renderFilteredStories();
+
+                } catch (error) {
+                    console.error("Failed to fetch multireddit stories:", error);
+                    showErrorPopup(`Could not fetch stories. One of the subreddits might be private, banned, or misspelled. ${error.message}`);
+                    storyContainer.innerHTML = '';
+                } finally {
+                    showLoading(false, false);
+                    isLoadingMore = false;
+                }
+                return; // End execution for multireddit case
+            }
+            // --- END: NEW MULTIREDDIT FETCH LOGIC ---
+
+
+            // --- Original logic for single subreddits and all searches ---
             let redditUrl;
             if (query) {
-                redditUrl = `${REDDIT_API_BASE_URL}r/${subreddit}/search.json?q=${encodeURIComponent(query)}&sort=${sort}&t=${timeRange}&restrict_sr=on&limit=25`;
+                redditUrl = `${REDDIT_BASE_URL}r/${subreddit}/search.json?q=${encodeURIComponent(query)}&sort=${sort}&t=${timeRange}&restrict_sr=on&limit=25`;
             } else {
-                redditUrl = `${REDDIT_API_BASE_URL}r/${subreddit}/${sort}.json?limit=25&t=${timeRange}`;
+                redditUrl = `${REDDIT_BASE_URL}r/${subreddit}/${sort}.json?limit=25&t=${timeRange}`;
             }
 
             if (loadMore && currentAfterToken) {
@@ -691,7 +716,7 @@ window.addEventListener('load', () => {
 
             try {
                 const response = await fetch(redditUrl);
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                if (!response.ok) throw new Error(`Failed to fetch`);
                 const data = await response.json();
                 const newPosts = data.data.children.map(p => p.data);
                 
@@ -700,8 +725,6 @@ window.addEventListener('load', () => {
 
                 displayStories(newPosts);
                 renderFilteredStories();
-
-
             } catch (error) {
                 console.error("Failed to fetch stories:", error);
                 showErrorPopup(`Could not fetch stories. The subreddit might be private, banned, or misspelled. ${error.message}`);
@@ -714,9 +737,7 @@ window.addEventListener('load', () => {
 
         async function fetchAndShowComments(story) {
             closePopup();
-
             popupBody.innerHTML = '';
-
             currentStoryId = story.id;
             addStoryToHistory(story);
             const storyCard = storyContainer.querySelector(`.story-card[data-story-id="${story.id}"]`);
@@ -826,7 +847,7 @@ window.addEventListener('load', () => {
             }
             headerActions.innerHTML = '';
             
-            const redditLink = `https://www.reddit.com${story.permalink}`;
+            const redditLink = `${REDDIT_BASE_URL}${story.permalink}`;
             
             const shareBtn = document.createElement('button');
             shareBtn.className = 'icon-button';
@@ -887,7 +908,7 @@ window.addEventListener('load', () => {
             finalContent += createMediaElement(story, true);
 
             if (story.crosspost_parent_list && story.crosspost_parent_list.length > 0) {
-                 finalContent += `<div class="crosspost-info">Cross-posted from <a href="#" onclick="event.preventDefault(); window.open('https://www.reddit.com/r/${story.crosspost_parent_list[0].subreddit}', '_blank')">r/${story.crosspost_parent_list[0].subreddit}</a></div>`;
+                 finalContent += `<div class="crosspost-info">Cross-posted from <a href="#" onclick="event.preventDefault(); window.open('${REDDIT_BASE_URL}r/${story.crosspost_parent_list[0].subreddit}', '_blank')">r/${story.crosspost_parent_list[0].subreddit}</a></div>`;
             }
 
             if (storyText) {
@@ -918,7 +939,7 @@ window.addEventListener('load', () => {
             topLevelComments = [];
 
             try {
-                const commentsUrl = `${REDDIT_API_BASE_URL}r/${story.subreddit}/comments/${story.id}.json?sort=${sort}`;
+                const commentsUrl = `${REDDIT_BASE_URL}r/${story.subreddit}/comments/${story.id}.json?sort=${sort}`;
                 const response = await fetch(commentsUrl);
                 if (!response.ok) {
                     let errorText = `HTTP error! status: ${response.status}`;
@@ -943,7 +964,6 @@ window.addEventListener('load', () => {
                 currentCommentSection.innerHTML = `<p>${error.message}</p>`;
             }
         }
-
 
         function appendComments(postName, commentData) {
             const commentSection = document.getElementById('comment-section');
@@ -999,7 +1019,7 @@ window.addEventListener('load', () => {
         async function fetchMoreComments(postName, childrenIds, buttonContainer) {
             try {
                 const ids = childrenIds.slice(0, 100).join(',');
-                const url = `https://api.reddit.com/api/morechildren.json?api_type=json&link_id=${postName}&children=${ids}`;
+                const url = `${REDDIT_BASE_URL}api/morechildren.json?api_type=json&link_id=${postName}&children=${ids}`;
                 const response = await fetch(url);
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const data = await response.json();
